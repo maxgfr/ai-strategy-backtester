@@ -1,0 +1,21 @@
+{
+  "name": "st-scalp-rsi-bb",
+  "description": "Bollinger Band mean reversion scalper — buy near lower band when RSI oversold and volume spikes above average, sell at middle band or RSI overbought",
+  "indicators": {
+    "bollingerBands": { "period": 12, "stdDev": 2 },
+    "rsi": { "period": 7 },
+    "volumeSma": { "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", "<", "bollingerBands.lower"],
+      ["rsi", "<", 30],
+      ["volume", ">", "volumeSma"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", ">", "bollingerBands.middle"], ["rsi", ">", 70]]
+  }
+}

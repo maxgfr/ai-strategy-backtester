@@ -1,0 +1,26 @@
+{
+  "name": "st-vwap-momentum",
+  "description": "VWAP-gated momentum scalper — price above VWAP as baseline, score mode with ROC, MFI, volume, and RSI for entry confirmation",
+  "indicators": {
+    "vwap": {},
+    "roc": { "period": 5 },
+    "mfi": { "period": 7 },
+    "volumeSma": { "period": 10 },
+    "rsi": { "period": 7 }
+  },
+  "buy": {
+    "mode": "score",
+    "threshold": 3,
+    "required": [["close", ">", "vwap"]],
+    "scored": [
+      ["roc", ">", 0],
+      ["mfi", "<", 40],
+      ["volume", ">", "volumeSma"],
+      ["rsi", "<", 45]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "vwap"], ["rsi", ">", 75], ["mfi", ">", 80]]
+  }
+}

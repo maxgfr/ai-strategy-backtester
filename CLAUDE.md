@@ -18,19 +18,26 @@ Crypto strategy backtester using Binance historical data. Entry point is a plain
 
 ```
 strategies/                          # ALL strategies as JSON (no TS strategies)
-├── pmax.json                        # PMAX trend following
-├── supertrend.json                  # Supertrend trend following
-├── turtle.json                      # Turtle Trading (breakout + trailing stop)
-├── confluence.json                  # Multi-indicator scoring
-├── rsi-macd-buy.json           # RSI oversold + MACD buy
-└── breakout-volume.json             # Donchian breakout + volume
+├── pmax.json                        # PMAX trend following (long-term)
+├── supertrend.json                  # Supertrend trend following (long-term)
+├── turtle.json                      # Turtle Trading (long-term)
+├── confluence.json                  # Multi-indicator scoring (long-term)
+├── rsi-macd-buy.json                # RSI oversold + MACD buy (long-term)
+├── breakout-volume.json             # Donchian breakout + volume (long-term)
+├── st-scalp-rsi-bb.json            # BB mean reversion scalper (short-term)
+├── st-stochrsi-keltner.json        # StochRSI + Keltner scalper (short-term)
+├── st-fast-supertrend.json         # Fast Supertrend + MACD (short-term)
+├── st-vwap-momentum.json           # VWAP-gated momentum (short-term)
+├── st-donchian-micro.json          # Micro Donchian breakout (short-term)
+├── st-psar-roc.json                # Fast PSAR + ROC + CMF (short-term)
+└── st-kdj-ema-scalp.json           # KDJ + EMA crossover scalp (short-term)
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
 ├── generate.ts             # CLI entry point for AI strategy generation
-├── simulation.ts           # Simulation engine: worker pool, metrics
-├── simulation.worker.ts    # Worker process for parallel backtesting
-├── report.ts               # HTML report generation from simulation results
-├── config.ts               # Config loader (reads config.json → AppConfig)
+├── simulation.ts           # Simulation engine: worker pool, metrics, profile iteration
+├── simulation.worker.ts    # Worker process for parallel backtesting (accepts maxArraySize)
+├── report.ts               # HTML report generation with category comparison (short/long-term)
+├── config.ts               # Config loader (reads config.json → AppConfig, supports profiles)
 ├── data.ts                 # OHLCV data fetching (Binance) and caching to disk
 ├── database.ts             # Synchronous JSON file store (plain fs, no lowdb)
 ├── trade.ts                # Buy/sell execution logic (used by simulation)
@@ -38,7 +45,7 @@ src/
 ├── types.ts                # Core types (CandleStick, Position, DbSchema, BinanceInterval)
 ├── utils.ts                # Utilities (round, formatDate, addMonths)
 ├── strategies/
-│   ├── registry.ts         # Strategy discovery (JSON-only, no builtin TS strategies)
+│   ├── registry.ts         # Strategy discovery + pattern matching (*, st-*, exact names)
 │   ├── types.ts            # StrategyFn, Signal, StrategyName types
 │   └── custom/             # Declarative JSON strategy engine
 │       ├── types.ts        # Schema types (CustomStrategyDef, SignalBlock, Condition)
@@ -61,7 +68,8 @@ pnpm backtest:report          # Backtest matrix — generates report AND opens i
 pnpm backtest BTCUSDT 4h 2021-01-01 2022-01-01 pmax  # Targeted backtest
 pnpm backtest --report BTCUSDT 4h 2021-01-01 2022-01-01 pmax  # Targeted + open report
 pnpm report                   # Regenerate HTML report from existing db/ results
-pnpm generate-strategy "..."  # AI-generate a custom strategy from natural language
+pnpm generate-strategy "..."  # AI-generate a long-term strategy from natural language
+pnpm generate-strategy --short-term "..."  # AI-generate a short-term (st-*) strategy
 
 pnpm test                     # Vitest unit tests (run once)
 pnpm test:watch               # Vitest watch mode
@@ -110,14 +118,20 @@ All configuration is externalized in `config.json` at the project root. Loaded b
 | `trading.fees` | `0.0026` | Trading fees (0.26%) |
 | `trading.initialCapital` | `10000` | Starting capital |
 
-### Simulation
+### Simulation Profiles
 
-| Field | Default | Description |
-|---|---|---|
-| `simulation.maxArraySize` | `1000` | Max candles kept in sliding window |
-| `simulation.periods` | `["4h","6h","8h"]` | Timeframes to test |
-| `simulation.strategies` | `["*"]` | Strategy names (`"*"` = all JSON files in `strategies/`) |
-| `simulation.dates` | Date range array | Backtesting periods |
+Config supports named simulation profiles under `simulation.profiles`. Each profile has its own `maxArraySize`, `periods`, `strategies`, and `dates`. Backward-compatible with flat `simulation` format (treated as a single "default" profile).
+
+| Field | Description |
+|---|---|
+| `simulation.profiles.<name>.maxArraySize` | Max candles kept in sliding window (3000 for short-term, 1000 for long-term) |
+| `simulation.profiles.<name>.periods` | Timeframes to test (e.g., `["15m","30m","1h"]` or `["4h","6h","8h"]`) |
+| `simulation.profiles.<name>.strategies` | Strategy patterns: `"*"` = all non-`st-` prefixed, `"st-*"` = all `st-` prefixed, or exact names |
+| `simulation.profiles.<name>.dates` | Date range array for backtesting |
+
+**Default profiles:**
+- `longTerm`: periods `4h/6h/8h`, strategies `*` (all non-st-), dates 2022-01-01 to 2026-02-01
+- `shortTerm`: periods `15m/30m/1h`, strategies `st-*`, dates 2025-06-01 to 2026-02-01
 
 ### Generation (AI Strategy Generation)
 
@@ -145,7 +159,9 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 
 **All strategies are JSON-only.** There are no hardcoded TypeScript strategies. Each strategy is a `.json` file in `strategies/` that composes indicators from the catalog.
 
-### Built-in Strategies
+### Long-Term Strategies
+
+Optimized for 4h/6h/8h timeframes. Selected by pattern `"*"` (all non-`st-` prefixed).
 
 | Strategy | File | Description |
 |----------|------|-------------|
@@ -163,6 +179,20 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Dual Supertrend** | `dual-supertrend.json` | Two Supertrend instances (factor 2 fast + factor 7 slow) must both confirm — dual trend filter |
 | **Triple Trend Gate** | `triple-trend-gate.json` | PMAX + Supertrend + Aroon all bullish (required) + score mode RSI/MACD/Volume filters |
 | **Volume Breakout CMF** | `volume-breakout-cmf.json` | CMF positive (institutional flow) + volume above SMA + Supertrend UP + ADX trending |
+
+### Short-Term Strategies
+
+Optimized for 15m/30m/1h timeframes. Prefixed with `st-`, selected by pattern `"st-*"`. Parameters tuned for faster signals.
+
+| Strategy | File | Description |
+|----------|------|-------------|
+| **ST Scalp RSI BB** | `st-scalp-rsi-bb.json` | BB(12) mean reversion + RSI(7) oversold + volume spike above SMA(10) |
+| **ST StochRSI Keltner** | `st-stochrsi-keltner.json` | StochRSI(7) oversold near Keltner(10) lower band + volume confirmation |
+| **ST Fast Supertrend** | `st-fast-supertrend.json` | Fast Supertrend(5,2) + fast MACD(6,13,5) + ADX(10) trend filter |
+| **ST VWAP Momentum** | `st-vwap-momentum.json` | VWAP gate + score mode with ROC(5)/MFI(7)/volumeSma(10)/RSI(7) |
+| **ST Donchian Micro** | `st-donchian-micro.json` | 20-period breakout entry, 5-period trailing exit + ADX(10) + volume |
+| **ST PSAR ROC** | `st-psar-roc.json` | Fast PSAR(0.03,0.25) trend flip + ROC(5) momentum + CMF(10) flow |
+| **ST KDJ EMA Scalp** | `st-kdj-ema-scalp.json` | KDJ(5,2,2) J-extreme recovery + EMA(5)/EMA(13) crossover + volume |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories. Each returns `Signal = 'buy' | 'sell' | null`.
 
@@ -186,7 +216,7 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 
 **35 indicators available** in the catalog (`src/strategies/custom/catalog.ts`): rsi, ema, supertrend, bollingerBands, obv, vwap, cmf, williamsR, cci, roc, ad, mfi, psar, ao, movingAverage, trix, volumeOscillator, macd, pmax, adx, donchian, stochastic, aroon, ichimoku, vortex, chandelier, keltner, starcBands, movingAverageEnvelope, atrTrailingStop, pmo, kdj, stochRsi, volumeSma, atrRatio.
 
-**AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — uses an OpenAI-compatible endpoint to generate, validate, and save a strategy JSON.
+**AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — generates a long-term strategy. Add `--short-term` flag to generate a `st-*` prefixed strategy with shorter indicator periods tuned for 15m/30m/1h timeframes. The LLM receives category-specific guidance (parameter cheat sheet, naming rules).
 
 **Manual generation:** When the user asks to create or generate a strategy (without using `pnpm generate-strategy`), follow the spec in `STRATEGY_PROMPT.md` at the project root. It contains the full JSON schema, all 35 indicators with parameters and fields, value reference syntax, and examples. Write the JSON file directly to `strategies/` — it will be auto-discovered on the next backtest.
 
@@ -195,9 +225,14 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 ## Backtesting Architecture
 
 - **Single backtest**: `pnpm backtest PAIR INTERVAL START END STRATEGY` — runs in main process
-- **Full matrix**: `pnpm backtest` (no args) — generates all strategy x period x date combinations, pre-downloads data, then dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
+- **Full matrix**: `pnpm backtest` (no args) — iterates over all simulation profiles, resolves strategy patterns per profile, pre-downloads data, then dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
+- Each worker receives `maxArraySize` from its profile (3000 for short-term, 1000 for long-term)
 - Results saved as `db/{pair}_{interval}_{strategy}_{start}_{end}.json`
-- Report generated as `reports/report.html` with best strategy, averages, and full rankings
+- Report generated as `reports/report.html` with:
+  - **Category comparison cards** (best long-term vs best short-term side by side)
+  - **Filter buttons** (All / Long-Term / Short-Term) to toggle rankings and averages tables
+  - **Category badges** on each row showing Short-Term (blue) or Long-Term (green)
+  - Classification based on interval: 1m/3m/5m/15m/30m/1h = Short-Term, 4h+ = Long-Term
 
 ---
 
@@ -212,6 +247,8 @@ type StrategyName = string                       // builtin: pmax, supertrend, t
 type CandleStick = { open, high, close, low, volume, time }
 type LastPosition = { date, type, price, capital, assets, tradeProfit? }
 type DbSchema = { version, initialParameters, historicPosition, position, ...metrics }
+type SimulationProfile = { name, maxArraySize, periods, strategies, dates }  // in config.ts
+type AppConfig = { trading, simulation: { profiles: SimulationProfile[] }, generation, paths }
 ```
 
 ---

@@ -7,6 +7,14 @@ export type DateRange = {
   readonly end: Date
 }
 
+export type SimulationProfile = {
+  readonly name: string
+  readonly maxArraySize: number
+  readonly periods: BinanceInterval[]
+  readonly strategies: string[]
+  readonly dates: DateRange[]
+}
+
 export type GenerationConfig = {
   readonly enabled: boolean
   readonly apiKey: string
@@ -26,10 +34,7 @@ export type AppConfig = {
     readonly initialCapital: number
   }
   readonly simulation: {
-    readonly maxArraySize: number
-    readonly periods: BinanceInterval[]
-    readonly strategies: string[]
-    readonly dates: DateRange[]
+    readonly profiles: SimulationProfile[]
   }
   readonly generation: GenerationConfig
   readonly paths: {
@@ -49,6 +54,13 @@ type RawGenerationConfig = {
   temperature: number
 }
 
+type RawProfile = {
+  maxArraySize: number
+  periods: BinanceInterval[]
+  strategies: string[]
+  dates: RawDateRange[]
+}
+
 type RawConfig = {
   trading: {
     from: string
@@ -57,18 +69,52 @@ type RawConfig = {
     fees: number
     initialCapital: number
   }
-  simulation: {
-    maxArraySize: number
-    periods: BinanceInterval[]
-    strategies: string[]
-    dates: RawDateRange[]
-  }
+  simulation:
+    | {
+        profiles: Record<string, RawProfile>
+      }
+    | {
+        maxArraySize: number
+        periods: BinanceInterval[]
+        strategies: string[]
+        dates: RawDateRange[]
+      }
   generation?: RawGenerationConfig
   paths: AppConfig['paths']
 }
 
 function resolveDate(value: string): Date {
   return value === 'now' ? new Date() : new Date(value)
+}
+
+function parseDates(dates: RawDateRange[]): DateRange[] {
+  return dates.map((d) => ({
+    start: resolveDate(d.start),
+    end: resolveDate(d.end),
+  }))
+}
+
+function parseProfiles(raw: RawConfig['simulation']): SimulationProfile[] {
+  if ('profiles' in raw) {
+    return Object.entries(raw.profiles).map(([name, profile]) => ({
+      name,
+      maxArraySize: profile.maxArraySize,
+      periods: profile.periods,
+      strategies: profile.strategies,
+      dates: parseDates(profile.dates),
+    }))
+  }
+
+  // Backward compat: flat simulation config → single unnamed profile
+  return [
+    {
+      name: 'default',
+      maxArraySize: raw.maxArraySize,
+      periods: raw.periods,
+      strategies: raw.strategies,
+      dates: parseDates(raw.dates),
+    },
+  ]
 }
 
 export function loadConfig(path?: string): AppConfig {
@@ -89,11 +135,7 @@ export function loadConfig(path?: string): AppConfig {
       pair: raw.trading.from + raw.trading.to,
     },
     simulation: {
-      ...raw.simulation,
-      dates: raw.simulation.dates.map((d) => ({
-        start: resolveDate(d.start),
-        end: resolveDate(d.end),
-      })),
+      profiles: parseProfiles(raw.simulation),
     },
     generation: {
       ...(raw.generation ?? defaultGeneration),

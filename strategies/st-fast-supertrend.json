@@ -1,0 +1,21 @@
+{
+  "name": "st-fast-supertrend",
+  "description": "Fast Supertrend trend follower — short ATR period and low multiplier for quick signals, confirmed by fast MACD and ADX trending",
+  "indicators": {
+    "supertrend": { "atrPeriod": 5, "multiplier": 2 },
+    "macd": { "fast": 6, "slow": 13, "signal": 5 },
+    "adx": { "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "supertrend"],
+      ["macd.histogram", ">", 0],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "supertrend"], ["macd.histogram", "<", 0]]
+  }
+}

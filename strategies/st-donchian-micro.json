@@ -1,0 +1,22 @@
+{
+  "name": "st-donchian-micro",
+  "description": "Micro Donchian breakout — 20-period breakout entry with 5-period trailing exit, ADX trending filter and volume confirmation",
+  "indicators": {
+    "breakout": { "_type": "donchian", "period": 20 },
+    "exit": { "_type": "donchian", "period": 5 },
+    "adx": { "period": 10 },
+    "volumeSma": { "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "breakout.upper[-1]"],
+      ["adx.adx", ">", 20],
+      ["volume", ">", "volumeSma"]
+    ]
+  },
+  "sell": {
+    "mode": "all",
+    "conditions": [["close", "<", "exit.lower[-1]"]]
+  }
+}

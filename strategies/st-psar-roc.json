@@ -1,0 +1,17 @@
+{
+  "name": "st-psar-roc",
+  "description": "Fast Parabolic SAR trend flip + ROC momentum + CMF volume flow — catches quick reversals with institutional flow confirmation",
+  "indicators": {
+    "psar": { "step": 0.03, "max": 0.25 },
+    "roc": { "period": 5 },
+    "cmf": { "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [["close", ">", "psar"], ["roc", ">", 0], ["cmf", ">", 0]]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "psar"], ["roc", "<", -1]]
+  }
+}

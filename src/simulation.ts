@@ -1,11 +1,16 @@
 import { fork } from 'node:child_process'
 import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { type AppConfig, buildDbModel, loadConfig } from './config'
+import {
+  type AppConfig,
+  buildDbModel,
+  loadConfig,
+  type SimulationProfile,
+} from './config'
 import { cleanFilesOfFolder, readAndLoadData } from './data'
 import { Database, type IDatabase } from './database'
 import { logger } from './logger'
-import { getStrategy, listStrategies } from './strategies/registry'
+import { getStrategy, listStrategiesByPattern } from './strategies/registry'
 import type { StrategyFn } from './strategies/types'
 import { executeBuy, executeSell } from './trade'
 import type { BinanceInterval, CandleStick } from './types'
@@ -27,6 +32,7 @@ type WorkerData = {
   endDateIso: string
   strategyName: string
   dbPath: string
+  maxArraySize: number
 }
 
 function computeTradeStats(db: IDatabase): void {
@@ -102,6 +108,7 @@ async function simulation(
   dbPath: string,
   strategy: StrategyFn,
   config: AppConfig,
+  maxArraySize: number,
 ): Promise<void> {
   const db = new Database(dbPath, buildDbModel(config))
   const historic: Array<CandleStick> = await readAndLoadData(
@@ -113,7 +120,6 @@ async function simulation(
   )
 
   const { fees, initialCapital } = config.trading
-  const { maxArraySize } = config.simulation
   const window: CandleStick[] = []
 
   for (let i = 0; i < historic.length; i++) {
@@ -179,9 +185,21 @@ export async function runSingleSimulation(
   dbPath: string,
   strategyName: string,
   config: AppConfig,
+  maxArraySize?: number,
 ): Promise<void> {
   const strategy = getStrategy(strategyName)
-  await simulation(interval, pair, startDate, endDate, dbPath, strategy, config)
+  const arraySize =
+    maxArraySize ?? config.simulation.profiles[0]?.maxArraySize ?? 1000
+  await simulation(
+    interval,
+    pair,
+    startDate,
+    endDate,
+    dbPath,
+    strategy,
+    config,
+    arraySize,
+  )
 }
 
 function spawnWorker(data: WorkerData): Promise<void> {
@@ -238,6 +256,10 @@ async function runWorkerPool(
   )
 }
 
+function resolveStrategiesForProfile(profile: SimulationProfile): string[] {
+  return listStrategiesByPattern(profile.strategies)
+}
+
 export async function runSimulation(
   params?: SimulationParams,
   configPath?: string,
@@ -247,10 +269,8 @@ export async function runSimulation(
   cleanFilesOfFolder([config.paths.dbFolder], ['.gitkeep', '.gitignore'])
 
   if (params) {
-    const defaultStrategy =
-      config.simulation.strategies[0] === '*'
-        ? listStrategies()[0]
-        : config.simulation.strategies[0]
+    const firstProfile = config.simulation.profiles[0]
+    const defaultStrategy = resolveStrategiesForProfile(firstProfile)[0]
     const strategyName = params.strategy ?? defaultStrategy
     await runSingleSimulation(
       params.interval,
@@ -260,44 +280,82 @@ export async function runSimulation(
       `${config.paths.dbFolder}/${params.pair}_${params.interval}_${strategyName}_${formatDate(params.startDate)}_${formatDate(params.endDate)}.json`,
       strategyName,
       config,
+      firstProfile?.maxArraySize,
     )
     logger.info(
       `Simulation with pair '${params.pair}', interval '${params.interval}', strategy '${strategyName}' finished`,
     )
   } else {
     const pair = config.trading.pair
-    const strategies =
-      config.simulation.strategies.length === 1 &&
-      config.simulation.strategies[0] === '*'
-        ? listStrategies()
-        : config.simulation.strategies
-    const combinations = strategies.flatMap((strategyName) =>
-      config.simulation.periods.flatMap((period) =>
-        config.simulation.dates.map((dates) => ({
-          strategyName,
-          period,
-          dates,
-        })),
-      ),
-    )
+    const allCombinations: WorkerData[] = []
 
-    // Pre-download unique data files to avoid race conditions between workers
     const uniqueData = new Map<
       string,
       { interval: BinanceInterval; pair: string; start: Date; end: Date }
     >()
-    for (const { period, dates } of combinations) {
-      const key = `${pair}_${period}_${formatDate(dates.start)}_${formatDate(dates.end)}`
-      if (!uniqueData.has(key)) {
-        uniqueData.set(key, {
+
+    for (const profile of config.simulation.profiles) {
+      const strategies = resolveStrategiesForProfile(profile)
+
+      if (strategies.length === 0) {
+        logger.warn(
+          `Profile "${profile.name}": no strategies matched patterns [${profile.strategies.join(', ')}]`,
+        )
+        continue
+      }
+
+      logger.info(
+        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods x ${profile.dates.length} date ranges`,
+      )
+
+      const combinations = strategies.flatMap((strategyName) =>
+        profile.periods.flatMap((period) =>
+          profile.dates.map((dates) => ({
+            strategyName,
+            period,
+            dates,
+            maxArraySize: profile.maxArraySize,
+          })),
+        ),
+      )
+
+      for (const { period, dates } of combinations) {
+        const key = `${pair}_${period}_${formatDate(dates.start)}_${formatDate(dates.end)}`
+        if (!uniqueData.has(key)) {
+          uniqueData.set(key, {
+            interval: period,
+            pair,
+            start: dates.start,
+            end: dates.end,
+          })
+        }
+      }
+
+      for (const {
+        strategyName,
+        period,
+        dates,
+        maxArraySize,
+      } of combinations) {
+        allCombinations.push({
+          configPath,
           interval: period,
           pair,
-          start: dates.start,
-          end: dates.end,
+          startDateIso: dates.start.toISOString(),
+          endDateIso: dates.end.toISOString(),
+          strategyName,
+          dbPath: `${config.paths.dbFolder}/${pair}_${period}_${strategyName}_${formatDate(dates.start)}_${formatDate(dates.end)}.json`,
+          maxArraySize,
         })
       }
     }
 
+    if (allCombinations.length === 0) {
+      logger.warn('No simulation combinations generated from any profile')
+      return
+    }
+
+    // Pre-download unique data files to avoid race conditions between workers
     logger.info(
       `Pre-downloading ${uniqueData.size} unique data files before worker dispatch`,
     )
@@ -309,22 +367,10 @@ export async function runSimulation(
 
     const maxWorkers = availableParallelism()
     logger.info(
-      `Dispatching ${combinations.length} simulations across ${Math.min(maxWorkers, combinations.length)} parallel processes`,
+      `Dispatching ${allCombinations.length} simulations across ${Math.min(maxWorkers, allCombinations.length)} parallel processes`,
     )
 
-    const workerTasks: WorkerData[] = combinations.map(
-      ({ strategyName, period, dates }) => ({
-        configPath,
-        interval: period,
-        pair,
-        startDateIso: dates.start.toISOString(),
-        endDateIso: dates.end.toISOString(),
-        strategyName,
-        dbPath: `${config.paths.dbFolder}/${pair}_${period}_${strategyName}_${formatDate(dates.start)}_${formatDate(dates.end)}.json`,
-      }),
-    )
-
-    await runWorkerPool(workerTasks, maxWorkers)
+    await runWorkerPool(allCombinations, maxWorkers)
   }
 
   logger.info('Simulation finished')

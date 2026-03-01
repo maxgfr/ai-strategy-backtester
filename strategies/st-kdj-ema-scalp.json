@@ -1,0 +1,22 @@
+{
+  "name": "st-kdj-ema-scalp",
+  "description": "KDJ J-line extreme recovery + fast EMA crossover — catches V-reversals when fast EMA crosses above slow EMA with volume spike",
+  "indicators": {
+    "kdj": { "rsvPeriod": 5, "kPeriod": 2, "dPeriod": 2 },
+    "emaFast": { "_type": "ema", "period": 5 },
+    "emaSlow": { "_type": "ema", "period": 13 },
+    "volumeSma": { "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["kdj.j", "<", 20],
+      ["emaFast", ">", "emaSlow"],
+      ["volume", ">", "volumeSma"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["kdj.j", ">", 80], ["emaFast", "<", "emaSlow"]]
+  }
+}

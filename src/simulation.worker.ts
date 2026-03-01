@@ -10,6 +10,7 @@ type WorkerData = {
   endDateIso: string
   strategyName: string
   dbPath: string
+  maxArraySize: number
 }
 
 process.on('message', (data: WorkerData) => {
@@ -23,6 +24,7 @@ process.on('message', (data: WorkerData) => {
     data.dbPath,
     data.strategyName,
     config,
+    data.maxArraySize,
   )
     .then(() => {
       process.send?.({ type: 'done' })
