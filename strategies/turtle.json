@@ -1,0 +1,16 @@
+{
+  "name": "turtle",
+  "description": "Turtle Trading — 200-period breakout entry, 10-period trailing stop exit",
+  "indicators": {
+    "breakout": { "_type": "donchian", "period": 200 },
+    "exit": { "_type": "donchian", "period": 10 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [["close", ">", "breakout.upper[-1]"]]
+  },
+  "sell": {
+    "mode": "all",
+    "conditions": [["close", "<", "exit.lower[-1]"]]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "trading": {
+    "from": "ETH",
+    "to": "USDT",
+    "period": "4h",
+    "fees": 0.0026,
+    "initialCapital": 10000
+  },
+  "simulation": {
+    "maxArraySize": 1000,
+    "periods": ["4h", "6h", "8h"],
+    "strategies": ["*"],
+    "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
+  },
+  "generation": {
+    "enabled": true,
+    "model": "mistral-small-latest",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "maxTokens": 4096,
+    "temperature": 0.7
+  },
+  "paths": {
+    "dbFolder": "db",
+    "dbFile": "data",
+    "logFile": "all.log"
+  }
+}

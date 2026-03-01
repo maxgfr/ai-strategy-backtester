@@ -1,0 +1,21 @@
+{
+  "name": "breakout-volume",
+  "description": "Donchian breakout + ADX trending + volume confirmation",
+  "indicators": {
+    "donchian": { "period": 50 },
+    "adx": { "period": 14 },
+    "volumeOscillator": { "fastPeriod": 5, "slowPeriod": 20 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "donchian.upper[-1]"],
+      ["adx.adx", ">", 25],
+      ["volumeOscillator", ">", 0]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "donchian.lower[-1]"]]
+  }
+}

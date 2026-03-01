@@ -1,0 +1,21 @@
+{
+  "name": "rsi-macd-reversal",
+  "description": "Buy RSI oversold + MACD momentum, sell RSI overbought",
+  "indicators": {
+    "rsi": { "period": 14 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
+    "ema": { "period": 50 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["rsi", "<", 35],
+      ["macd.histogram", ">", 0],
+      ["close", ">", "ema"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["rsi", ">", 70]]
+  }
+}

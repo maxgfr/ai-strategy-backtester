@@ -1,0 +1,43 @@
+{
+  "name": "ai-strategy-backtester",
+  "author": "Maxime Golfier",
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "backtest": "tsx src/backtest.ts",
+    "backtest:report": "tsx src/backtest.ts --report",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "pnpm clean:db && pnpm clean:data",
+    "clean:db": "find ./db -type f ! -name '.gitignore' ! -name '.gitkeep' -delete",
+    "clean:data": "find ./data -type f ! -name '.gitignore' ! -name '.gitkeep' -delete",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "fix": "biome check --write .",
+    "report": "tsx src/report.ts",
+    "generate-strategy": "tsx src/generate.ts"
+  },
+  "dependencies": {
+    "binance-historical": "^1.6.5",
+    "dotenv": "^17.3.1",
+    "winston": "^3.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "protobufjs"
+    ]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0"
+  }
+}
