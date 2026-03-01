@@ -1,0 +1,31 @@
+{
+  "name": "triple-trend-gate",
+  "description": "Triple trend confirmation gate: PMAX long + Supertrend UP + Aroon bullish (up > down) — only enters when ALL major trend indicators agree. Score mode with RSI + MACD + Volume filters",
+  "indicators": {
+    "pmax": { "emaPeriod": 10, "atrPeriod": 10, "multiplier": 3 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "aroon": { "period": 25 },
+    "rsi": { "period": 14 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
+    "volumeSma": { "period": 20 }
+  },
+  "buy": {
+    "mode": "score",
+    "threshold": 3,
+    "required": [
+      ["pmax.pmax", "==", "pmax.pmaxLong"],
+      ["close", ">", "supertrend"]
+    ],
+    "scored": [
+      ["aroon.up", ">", "aroon.down"],
+      ["rsi", "<", 60],
+      ["rsi", ">", 35],
+      ["macd.histogram", ">", 0],
+      ["volume", ">", "volumeSma"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["pmax.pmax", "==", "pmax.pmaxShort"], ["rsi", ">", 76]]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "williams-extreme-momentum",
+  "description": "Williams %R extreme oversold (< -80) + MACD histogram positive — like rsi-macd-buy but using Williams %R which detects MORE extreme oversold zones. Catches absolute market panic bottoms",
+  "indicators": {
+    "williamsR": { "period": 14 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
+    "rsi": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [["williamsR", "<", -80], ["macd.histogram", ">", 0]]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["williamsR", ">", -20], ["rsi", ">", 72]]
+  }
+}

@@ -155,6 +155,14 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume + ATR + EMA). Score mode with threshold. |
 | **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive entry, RSI overbought exit |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX trending + volume confirmation |
+| **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover (oversold zone) in Supertrend uptrend + ADX + MACD — optimized for 6h |
+| **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend uptrend + RSI below 50 pullback + MACD positive + ADX — buy-the-dip, optimized for 6h |
+| **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex VI+/VI- crossover + ATR trailing stop exit + ADX + MACD — trend inception with dynamic trailing stop |
+| **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery from extreme oversold (< 0 to > 20) in Supertrend uptrend — catches V-shaped reversals |
+| **Williams Extreme Momentum** | `williams-extreme-momentum.json` | Williams %R extreme oversold (< -80) + MACD positive — panic bottom detector |
+| **Dual Supertrend** | `dual-supertrend.json` | Two Supertrend instances (factor 2 fast + factor 7 slow) must both confirm — dual trend filter |
+| **Triple Trend Gate** | `triple-trend-gate.json` | PMAX + Supertrend + Aroon all bullish (required) + score mode RSI/MACD/Volume filters |
+| **Volume Breakout CMF** | `volume-breakout-cmf.json` | CMF positive (institutional flow) + volume above SMA + Supertrend UP + ADX trending |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories. Each returns `Signal = 'buy' | 'sell' | null`.
 

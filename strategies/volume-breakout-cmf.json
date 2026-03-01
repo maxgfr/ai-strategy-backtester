@@ -1,0 +1,29 @@
+{
+  "name": "volume-breakout-cmf",
+  "description": "Institutional accumulation signal: CMF positive (smart money buying) + volume above SMA (institutional volume) + Supertrend UP + RSI recovering from pullback — follows the big money",
+  "indicators": {
+    "cmf": { "period": 20 },
+    "volumeSma": { "period": 20 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "rsi": { "period": 14 },
+    "adx": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "supertrend"],
+      ["cmf", ">", 0.05],
+      ["volume", ">", "volumeSma"],
+      ["rsi", "<", 60],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      ["close", "<", "supertrend"],
+      ["cmf", "<", -0.1],
+      ["rsi", ">", 76]
+    ]
+  }
+}

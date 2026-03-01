@@ -1,0 +1,23 @@
+{
+  "name": "dual-supertrend",
+  "description": "Dual Supertrend confirmation: fast (factor 2) + slow (factor 7) must both be bullish — drastically reduces false signals compared to single supertrend. ADX trending filter",
+  "indicators": {
+    "stFast": { "_type": "supertrend", "atrPeriod": 10, "multiplier": 2 },
+    "stSlow": { "_type": "supertrend", "atrPeriod": 10, "multiplier": 7 },
+    "adx": { "period": 14 },
+    "rsi": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "stFast"],
+      ["close", ">", "stSlow"],
+      ["adx.adx", ">", 20],
+      ["rsi", "<", 70]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "stSlow"], ["rsi", ">", 78]]
+  }
+}
