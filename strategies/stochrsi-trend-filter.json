@@ -1,6 +1,6 @@
 {
   "name": "stochrsi-trend-filter",
-  "description": "StochRSI K/D crossover entry (oversold zone) in confirmed uptrend (Supertrend + ADX + MACD), exits on trend reversal or RSI overbought",
+  "description": "StochRSI K/D crossover entry in confirmed uptrend (Supertrend + ADX + MACD), exits on trend reversal or RSI overbought",
   "indicators": {
     "supertrend": { "atrPeriod": 10, "multiplier": 3 },
     "stochRsi": {
@@ -19,7 +19,6 @@
       ["close", ">", "supertrend"],
       ["stochRsi.k", ">", "stochRsi.d"],
       ["stochRsi.k[-1]", "<", "stochRsi.d[-1]"],
-      ["stochRsi.k", "<", 60],
       ["adx.adx", ">", 20],
       ["macd.histogram", ">", 0]
     ]

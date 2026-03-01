@@ -10,7 +10,7 @@
   },
   "buy": {
     "mode": "score",
-    "threshold": 3,
+    "threshold": 2,
     "required": [["close", ">", "vwap"]],
     "scored": [
       ["roc", ">", 0],

@@ -1,92 +1,93 @@
 # AI Strategy Backtester
 
-Crypto strategy backtester on Binance historical data. Describe a trading strategy in plain English and let AI generate it, then backtest it against 30+ technical indicators across multiple timeframes and date ranges.
+Crypto strategy backtester using Binance historical data. Define trading strategies as declarative JSON, backtest them across multiple timeframes and date ranges, and compare results in an HTML report. AI can generate strategies from natural language.
 
 ## Features
 
-- **AI Strategy Generation** — describe a strategy in natural language, get a validated JSON strategy file ready to backtest
-- **30+ Technical Indicators** — RSI, MACD, Bollinger Bands, Supertrend, Ichimoku, ADX, PMAX, Donchian, and many more
-- **Declarative JSON Strategies** — no code needed, compose indicators with buy/sell conditions in JSON
-- **Parallel Backtesting** — matrix simulation across strategies, timeframes, and date ranges using worker pools
-- **HTML Reports** — auto-generated reports ranking strategies by profit, Sharpe ratio, win rate, max drawdown
+- **35 technical indicators** — RSI, MACD, Supertrend, Bollinger Bands, Ichimoku, KDJ, StochRSI, and more
+- **Declarative JSON strategies** — no code required, compose indicators with buy/sell conditions
+- **AI strategy generation** — describe a strategy in natural language, get a validated JSON file
+- **Simulation profiles** — separate long-term (4h/6h/8h) and short-term (15m/30m/1h) backtests
+- **Parallel execution** — worker pool dispatches simulations across all CPU cores
+- **HTML report** — ranked results with category comparison, filter buttons, and key metrics
+
+## Requirements
+
+- Node.js >= 24
+- pnpm >= 10
 
 ## Quick Start
 
 ```bash
 pnpm install
-```
 
-## Usage
-
-### Backtest
-
-```bash
-# Full matrix (all strategies x periods x dates)
+# Full matrix backtest (all profiles, all strategies)
 pnpm backtest
 
 # Full matrix + open HTML report in browser
 pnpm backtest:report
 
 # Targeted backtest
-pnpm backtest ETHUSDT 4h 2024-01-01 2025-01-01 supertrend
+pnpm backtest ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-buy
 
 # Targeted + open report
-pnpm backtest --report ETHUSDT 4h 2024-01-01 2025-01-01 supertrend
+pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-buy
 ```
 
-### Generate a Strategy with AI
+## Strategies
 
-Set `generation.enabled` to `true` in `config.json` and add your API key to `.env`:
+All strategies live as `.json` files in `strategies/`. They are auto-discovered on each run.
 
-```
-GENERATION_API_KEY=sk-...
-```
+### Long-Term (4h/6h/8h)
 
-Then generate a strategy from natural language:
-
-```bash
-pnpm generate-strategy "Buy when RSI < 10 and MACD histogram crosses above 0, sell when RSI > 50"
-```
-
-The AI validates the generated strategy against the indicator catalog before saving it to `strategies/`. You can immediately backtest it.
-
-### Write a Strategy Manually (or with any LLM)
-
-See [`STRATEGY_PROMPT.md`](STRATEGY_PROMPT.md) for the full specification: JSON schema, all 35 available indicators with parameters, value reference syntax, and examples. Copy-paste it to any LLM (Claude, ChatGPT, Mistral, etc.) and ask it to generate a strategy. Save the output as a `.json` file in `strategies/` — it will be auto-discovered on the next backtest.
-
-### Reports
-
-```bash
-# Regenerate HTML report from existing results
-pnpm report
-```
-
-## Built-in Strategies
+Standard kebab-case names. Optimized for multi-day holds with standard indicator periods.
 
 | Strategy | Description |
 |----------|-------------|
-| **PMAX** | EMA + ATR-based Supertrend trend following |
-| **Supertrend** | ATR-based trend following |
-| **Turtle** | Donchian breakout entry with trailing stop exit |
-| **Confluence** | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume) |
-| **RSI-MACD Reversal** | RSI oversold + MACD momentum entry, RSI overbought exit |
-| **Breakout Volume** | Donchian breakout + ADX trending + volume confirmation |
+| `rsi-macd-buy` | RSI oversold + MACD momentum |
+| `supertrend` | ATR-based trend following |
+| `turtle` | Donchian breakout + trailing stop |
+| `confluence` | Multi-indicator score mode |
+| `pmax` | EMA + ATR Supertrend |
+| `breakout-volume` | Donchian breakout + ADX + volume |
+| `supertrend-pullback-momentum` | Buy-the-dip in uptrend |
+| `stochrsi-trend-filter` | StochRSI crossover in trend |
+| `atr-trailing-vortex` | Vortex crossover + ATR trailing stop |
+| `kdj-extreme-recovery` | KDJ J-line recovery in uptrend |
+| `williams-extreme-momentum` | Williams %R extreme oversold + MACD |
+| `dual-supertrend` | Dual Supertrend confirmation |
+| `triple-trend-gate` | PMAX + Supertrend + Aroon gate |
+| `volume-breakout-cmf` | CMF flow + volume + Supertrend |
 
-## JSON Strategy Format
+### Short-Term (15m/30m/1h)
 
-Strategies are plain JSON files in `strategies/`. No TypeScript required.
+Prefixed with `st-`. Shorter indicator periods for faster signals.
+
+| Strategy | Description |
+|----------|-------------|
+| `st-scalp-rsi-bb` | BB mean reversion + RSI oversold |
+| `st-fast-supertrend` | Fast Supertrend + MACD + ADX |
+| `st-vwap-momentum` | VWAP gate + score mode |
+| `st-stochrsi-keltner` | StochRSI + Keltner lower band |
+| `st-donchian-micro` | Micro Donchian breakout |
+| `st-psar-roc` | PSAR + ROC + CMF |
+| `st-kdj-ema-scalp` | KDJ + EMA crossover |
+
+### Creating a Strategy
+
+Write a JSON file in `strategies/`:
 
 ```json
 {
   "name": "my-strategy",
-  "description": "What this strategy does",
+  "description": "Buy when RSI oversold and MACD positive",
   "indicators": {
     "rsi": { "period": 14 },
     "macd": { "fast": 12, "slow": 26, "signal": 9 }
   },
   "buy": {
     "mode": "all",
-    "conditions": [["rsi", "<", 35], ["macd.histogram", ">", 0]]
+    "conditions": [["rsi", "<", 30], ["macd.histogram", ">", 0]]
   },
   "sell": {
     "mode": "any",
@@ -95,23 +96,65 @@ Strategies are plain JSON files in `strategies/`. No TypeScript required.
 }
 ```
 
-**Signal modes:** `all` (AND), `any` (OR), `score` (count-based with threshold).
+**Signal modes:** `all` (AND), `any` (OR), `score` (count-based with threshold + optional required conditions).
+
+See [`STRATEGY_PROMPT.md`](STRATEGY_PROMPT.md) for the full specification: JSON schema, all 35 indicators with parameters, value reference syntax, anti-patterns, and examples. Copy-paste it to any LLM to generate strategies.
+
+### AI Generation
+
+Set `generation.enabled` to `true` in `config.json` and add your API key to `.env`:
+
+```
+GENERATION_API_KEY=sk-...
+```
+
+Generate a strategy from natural language:
+
+```bash
+# Long-term strategy (4h/6h/8h)
+pnpm generate-strategy "Buy when RSI is oversold and volume spikes above average"
+
+# Short-term strategy (15m/30m/1h)
+pnpm generate-strategy --short-term "Scalp mean reversion on Bollinger lower band"
+```
 
 ## Configuration
 
-All settings live in `config.json`:
+All settings in `config.json`:
 
-- **Trading** — pair, timeframe, fees, initial capital
-- **Simulation** — periods, strategies, date ranges
-- **Generation** — AI model, endpoint, temperature
+- **`trading`** — pair, fees, initial capital
+- **`simulation.profiles`** — named profiles with different timeframes, strategies, and date ranges
+- **`generation`** — AI model endpoint and parameters
 
-See `CLAUDE.md` for full configuration reference.
+### Simulation Profiles
+
+The backtest matrix runs separate profiles for long-term and short-term strategies:
+
+| Profile | Periods | Strategies | maxArraySize |
+|---------|---------|------------|--------------|
+| `longTerm` | 4h, 6h, 8h | `*` (all non-st-) | 1000 |
+| `shortTerm` | 15m, 30m, 1h | `st-*` | 3000 |
+
+## Reports
+
+```bash
+# Regenerate HTML report from existing db/ results
+pnpm report
+```
+
+The report includes:
+- Best strategy cards (overall, long-term, short-term)
+- Filter buttons to toggle by category
+- Full rankings table with profit, win rate, max drawdown, Sharpe ratio
+- Strategy averages across timeframes
 
 ## Development
 
 ```bash
-pnpm test              # Run tests
+pnpm test              # Vitest unit tests
 pnpm lint              # Biome lint
 pnpm format:check      # Biome format check
 pnpm typecheck         # TypeScript type check
 ```
+
+See `CLAUDE.md` for full architecture reference and AI assistance guidelines.

@@ -4,7 +4,6 @@ import {
   ao,
   aroon,
   atrTrailingStop,
-  bollingerBands,
   cci,
   chandelier,
   cmf,
@@ -34,6 +33,7 @@ import {
 import { ATR } from '../../indicators/atr'
 import { KDJ } from '../../indicators/kdj'
 import { SMA } from '../../indicators/primitives/sma'
+import { STDEV } from '../../indicators/primitives/stdev'
 import type { Candle } from '../../indicators/primitives/types'
 import { StochRSI } from '../../indicators/stochRsi'
 import type { CandleStick } from '../../types'
@@ -114,6 +114,37 @@ function volumeSmaWrapper(
   return results
 }
 
+function bollingerBandsObjectWrapper(
+  candles: CandleStick[],
+  params: Record<string, number>,
+): Array<{ upper: number; middle: number; lower: number; bbr: number }> {
+  const period = params.period ?? 20
+  const stdDevMultiplier = params.stdDev ?? 2
+  const sma = SMA({ candles: [], period })
+  const stdev = STDEV({ candles: [], period })
+  const results: Array<{
+    upper: number
+    middle: number
+    lower: number
+    bbr: number
+  }> = []
+  for (const c of candles) {
+    const candle: Candle = { time: c.time, close: c.close }
+    const basis = sma.update(candle)
+    const sd = stdev.update(candle)
+    if (!basis || !sd) {
+      results.push({ upper: 0, middle: 0, lower: 0, bbr: 0 })
+      continue
+    }
+    const dev = stdDevMultiplier * sd.value
+    const upper = basis.value + dev
+    const lower = basis.value - dev
+    const bbr = upper === lower ? 0 : (c.close - lower) / (upper - lower)
+    results.push({ upper, middle: basis.value, lower, bbr })
+  }
+  return results
+}
+
 function atrRatioWrapper(
   candles: CandleStick[],
   params: Record<string, number>,
@@ -162,12 +193,14 @@ export const catalog: Record<string, CatalogEntry> = {
     outputType: 'number',
   },
   bollingerBands: {
-    compute: (c, p) => bollingerBands(c, p.period ?? 20, p.stdDev ?? 2),
+    compute: bollingerBandsObjectWrapper,
     params: [
       { name: 'period', default: 20 },
       { name: 'stdDev', default: 2 },
     ],
-    outputType: 'number',
+    outputType: 'object',
+    fields: ['upper', 'middle', 'lower', 'bbr'],
+    defaultField: 'bbr',
   },
   obv: {
     compute: (c) => obv(c),

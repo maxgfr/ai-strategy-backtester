@@ -253,6 +253,41 @@ type AppConfig = { trading, simulation: { profiles: SimulationProfile[] }, gener
 
 ---
 
+## Strategy Design Guidelines
+
+When creating or reviewing strategies, apply these proven insights:
+
+### Anti-Patterns (Avoid)
+- **Too many AND conditions** (5+) on buy = 0 trades. Keep buy to 2-4 conditions max.
+- **Overlapping buy/sell thresholds** (buy RSI < 50, sell RSI > 45) — sell takes priority, blocks buys.
+- **Aggressive sell exits** (RSI > 60) cut winners short. Use RSI > 70-75 for sell.
+- **Score threshold imbalance** — too low (3/10) = noisy, too high (4/5) = no trades. Use ~50%.
+- **Missing trend filter** on RSI strategies — add Supertrend or ADX gate to survive bear markets.
+- **No volume confirmation** on breakout strategies — add `volumeSma` or `cmf`.
+- **Same RSI for buy/sell** (buy < 30, sell > 30) = whipsaw. Use asymmetric thresholds.
+- **Chandelier exit as trailing stop** — cuts profits too early. Prefer `atrTrailingStop` or Supertrend.
+
+### Design Principles
+- **Simple > Complex**: best strategy (249% profit) has 2 buy + 1 sell condition.
+- **Rare signals win**: 9 trades in 4 years but catches exact bottoms.
+- **ADX > 20** filters out ranging/choppy markets.
+- **6h often outperforms 4h** for long-term strategies (filters intraday whipsaws).
+- **Buy-the-dip in uptrend**: Supertrend UP + RSI pullback + MACD positive.
+- **Let winners run**: tight sell conditions kill great entries.
+
+### Threshold Quick Reference
+| Indicator | Oversold | Overbought | Trending |
+|-----------|----------|------------|----------|
+| `rsi` | < 30 (agg: < 35) | > 70 | 40-60 neutral |
+| `stochRsi.k` | < 20 | > 80 | — |
+| `williamsR` | < -80 | > -20 | — |
+| `adx.adx` | — | — | > 20 trend, > 25 strong |
+| `cmf` | < -0.1 | > 0.05 | — |
+| `kdj.j` | < 0 (ext: < 20) | > 80 | — |
+| `bollingerBands.bbr` | < 0 | > 1 | 0.5 = middle |
+
+---
+
 ## Important Notes for AI Assistance
 
 - **No HTTP server** — Entry point is a plain script. State persisted locally in `./db/*.json`
@@ -328,7 +363,7 @@ indicatorName(candles, period) // → number[] or object[]
 | Indicator | File | Key Parameters |
 |-----------|------|----------------|
 | **ATR** | `atr.ts` | `period=14` |
-| **Bollinger Bands** | `bollingerBands.ts` | `period=20`, `stdDev=2` |
+| **Bollinger Bands** | `bollingerBands.ts` | `period=20`, `stdDev=2` → {upper, middle, lower, bbr} |
 | **Keltner** | `keltner.ts` | `emaPeriod=20`, `atrPeriod=10`, `multiplier=1` |
 | **Donchian** | `donchian.ts` | `period=20` |
 | **STARC Bands** | `starcBands.ts` | `smaPeriod=5`, `atrPeriod=15`, `multiplier=1.33` |

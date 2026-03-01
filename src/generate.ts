@@ -123,6 +123,35 @@ ${buildCatalogDescription()}
 5. Every indicator referenced in conditions MUST be declared in "indicators"
 6. Alias names: letters only [a-zA-Z]+ (no numbers)
 7. Score mode: use \`scored\` array, not \`conditions\`
+
+## Anti-Patterns (AVOID)
+
+- Too many AND conditions on buy (5+) = almost never triggers = 0 trades. Keep buy to 2-4 conditions max.
+- Overlapping buy/sell thresholds (buy RSI < 50, sell RSI > 45) — sell takes priority, blocks buys.
+- Aggressive sell exits (RSI > 60) cut winners short. Use RSI > 70-75 for sell.
+- Score threshold too low (3/10) = noisy trades. Use threshold >= 50% of scored conditions.
+- Missing trend filter on RSI-based strategies — gets destroyed in bear markets. Add Supertrend or ADX gate.
+- No volume confirmation on breakout strategies — many false breakouts. Add volumeSma or cmf.
+- Same RSI threshold for buy and sell (buy < 30, sell > 30) = constant whipsaw. Use asymmetric thresholds.
+
+## Design Tips
+
+- Simple > Complex: best strategy has 2 buy + 1 sell condition, not 6+6.
+- Rare signals win: RSI < 35 + MACD > 0 = only 9 trades in 4 years but 249% profit.
+- ADX > 20 filters out ranging/choppy markets.
+- Buy-the-dip in uptrend works well: Supertrend UP + RSI pullback + MACD positive.
+- Let winners run: tight sell conditions kill great entries.
+
+## Typical Threshold Ranges
+
+- rsi: oversold < 30 (aggressive < 35), overbought > 70
+- stochRsi.k: oversold < 20, overbought > 80
+- williamsR: oversold < -80, overbought > -20
+- adx.adx: trending > 20, strong > 25, ranging < 20
+- cmf: accumulation > 0.05, distribution < -0.1
+- kdj.j: oversold < 0 (extreme < 20), overbought > 80
+- macd.histogram: bullish > 0, bearish < 0
+- bollingerBands.bbr: below lower band < 0, above upper band > 1, middle = 0.5
 `
 }
 

@@ -118,7 +118,6 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 | `ema` | `period=20` | Exponential Moving Average |
 | `movingAverage` | `period=20` | Simple Moving Average |
 | `supertrend` | `atrPeriod=10, multiplier=3` | ATR-based trend line |
-| `bollingerBands` | `period=20, stdDev=2` | Bollinger Bands width |
 | `obv` | _(none)_ | On-Balance Volume |
 | `vwap` | _(none)_ | Volume Weighted Average Price |
 | `cmf` | `period=20` | Chaikin Money Flow (-1 to +1) |
@@ -138,6 +137,7 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 
 | Name | Parameters | Fields (default in **bold**) |
 |------|-----------|------|
+| `bollingerBands` | `period=20, stdDev=2` | upper, middle, lower, **bbr** |
 | `macd` | `fast=12, slow=26, signal=9` | **macd**, signal, histogram |
 | `pmax` | `emaPeriod=10, atrPeriod=10, multiplier=3` | **pmax**, pmaxLong, pmaxShort |
 | `adx` | `period=14` | **adx**, pdi, mdi |
@@ -387,6 +387,57 @@ When designing `st-*` strategies, use shorter periods:
 | `psar` | `step: 0.02, max: 0.2` | `step: 0.03, max: 0.25` |
 | `donchian` | `period: 50-200` | `period: 10-20` |
 | `ema` | `period: 20-50` | `period: 5-13` |
+
+---
+
+## Anti-Patterns (DO NOT)
+
+These are common mistakes that produce bad strategies. Avoid them:
+
+1. **Too many conditions** — 5+ AND conditions on buy = almost never triggers = 0 trades. Keep buy conditions to 2-4 max.
+2. **Overlapping buy/sell conditions** — If RSI < 50 is a buy condition and RSI > 45 is a sell condition, sell takes priority and blocks buys. Ensure buy and sell ranges don't overlap.
+3. **Sell conditions that are too aggressive** — Sell at RSI > 60 exits profitable trades too early. Prefer RSI > 70-75 for sell.
+4. **Score threshold too low** — In score mode, threshold 3 out of 10 scored conditions is too permissive (generates hundreds of noisy trades). Use threshold >= 50% of scored conditions.
+5. **Score threshold too high** — threshold 4 out of 5 scored conditions almost never triggers. Balance is key.
+6. **Missing trend filter** — RSI-based strategies without a trend filter (Supertrend, EMA, ADX) get destroyed in bear markets. Always add a trend gate for oversold-based entries.
+7. **No volume confirmation** — Breakout strategies without volume confirmation produce many false breakouts. Add `volumeSma` or `cmf` check.
+8. **Using Chandelier exit as trailing stop** — Chandelier exit often cuts profitable trades too early. Prefer `atrTrailingStop` or Supertrend for exits.
+9. **Using the same RSI threshold for buy and sell** — e.g., buy at RSI < 30, sell at RSI > 30. This creates constant whipsawing. Use asymmetric thresholds (buy < 30, sell > 70).
+
+---
+
+## Design Principles (Lessons from Backtests)
+
+These are proven insights from backtesting 20+ strategies on ETHUSDT 2022-2026:
+
+1. **Simple > Complex** — The best strategy (rsi-macd-buy, 249% profit) has only 2 buy conditions and 1 sell condition. More conditions != better.
+2. **Rare signals win** — RSI < 35 + MACD histogram > 0 triggers only 9 trades in 4 years but catches exact market bottoms. Don't optimize for trade count.
+3. **Trend filter is essential** — In the 2022 bear market, most RSI-based strategies without Supertrend/EMA trend filter lost money.
+4. **ADX > 20 reduces noise** — Adding `["adx.adx", ">", 20]` removes signals in ranging/choppy markets.
+5. **6h often outperforms 4h** for long-term strategies — it filters out intraday whipsaws.
+6. **Buy-the-dip in uptrend** is very effective — Supertrend UP + RSI pullback below 50 + MACD positive catches quality dips.
+7. **Sell conditions matter more than buy** — An overly tight sell (RSI > 60) kills a great entry. Let winners run.
+
+---
+
+## Typical Value Ranges for Thresholds
+
+Use these as reference when setting condition thresholds:
+
+| Indicator | Oversold Zone | Overbought Zone | Trending |
+|-----------|--------------|-----------------|----------|
+| `rsi` | < 30 (aggressive: < 35) | > 70 (aggressive: > 75) | 40-60 neutral |
+| `stochRsi.k` | < 20 | > 80 | — |
+| `williamsR` | < -80 | > -20 | — |
+| `mfi` | < 20 (accumulation: < 40) | > 80 | — |
+| `adx.adx` | — | — | > 20 trending, > 25 strong, < 20 ranging |
+| `cmf` | < -0.1 (distribution) | > 0.05 (accumulation) | — |
+| `kdj.j` | < 0 (extreme: < 20) | > 80 (extreme: > 100) | — |
+| `roc` | < -2 (falling) | > 2 (rising) | around 0 = flat |
+| `cci` | < -100 | > 100 | — |
+| `macd.histogram` | < 0 | > 0 | — |
+| `atrRatio` | < 0.5 (low vol) | > 1.5 (high vol) | ~1.0 = normal |
+| `bollingerBands.bbr` | < 0 (below lower band) | > 1 (above upper band) | 0.5 = at middle |
 
 ---
 
