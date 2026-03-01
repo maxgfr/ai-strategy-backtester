@@ -45,10 +45,14 @@ GENERATION_API_KEY=sk-...
 Then generate a strategy from natural language:
 
 ```bash
-pnpm generate-strategy "Buy when RSI < 30 and MACD histogram crosses above 0, sell when RSI > 70"
+pnpm generate-strategy "Buy when RSI < 10 and MACD histogram crosses above 0, sell when RSI > 50"
 ```
 
 The AI validates the generated strategy against the indicator catalog before saving it to `strategies/`. You can immediately backtest it.
+
+### Write a Strategy Manually (or with any LLM)
+
+See [`STRATEGY_PROMPT.md`](STRATEGY_PROMPT.md) for the full specification: JSON schema, all 35 available indicators with parameters, value reference syntax, and examples. Copy-paste it to any LLM (Claude, ChatGPT, Mistral, etc.) and ask it to generate a strategy. Save the output as a `.json` file in `strategies/` — it will be auto-discovered on the next backtest.
 
 ### Reports
 

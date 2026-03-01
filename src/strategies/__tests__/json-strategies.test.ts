@@ -18,7 +18,7 @@ describe('JSON strategies via registry', () => {
     expect(names).toContain('supertrend')
     expect(names).toContain('turtle')
     expect(names).toContain('confluence')
-    expect(names).toContain('rsi-macd-reversal')
+    expect(names).toContain('rsi-macd-buy')
     expect(names).toContain('breakout-volume')
   })
 

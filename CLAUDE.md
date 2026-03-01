@@ -22,7 +22,7 @@ strategies/                          # ALL strategies as JSON (no TS strategies)
 ├── supertrend.json                  # Supertrend trend following
 ├── turtle.json                      # Turtle Trading (breakout + trailing stop)
 ├── confluence.json                  # Multi-indicator scoring
-├── rsi-macd-reversal.json           # RSI + MACD reversal
+├── rsi-macd-buy.json           # RSI oversold + MACD buy
 └── breakout-volume.json             # Donchian breakout + volume
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
@@ -93,7 +93,7 @@ This is mandatory. All four must pass:
 3. `pnpm format:check` — Biome formatting consistency
 4. `pnpm typecheck` — TypeScript type checking
 
-The CI enforces this — a failing check blocks the PR.
+**Never skip this step.** Run it after every code change, even small ones. Run it before suggesting the user commit or push. A broken push wastes time and blocks the CI.
 
 ---
 
@@ -153,7 +153,7 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Supertrend** | `supertrend.json` | ATR-based trend-following — buy when close > supertrend |
 | **Turtle** | `turtle.json` | 200-period Donchian breakout entry, 10-period trailing stop exit (uses `_type` aliasing) |
 | **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume + ATR + EMA). Score mode with threshold. |
-| **RSI-MACD Reversal** | `rsi-macd-reversal.json` | RSI oversold + MACD momentum entry, RSI overbought exit |
+| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive entry, RSI overbought exit |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX trending + volume confirmation |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories. Each returns `Signal = 'buy' | 'sell' | null`.
@@ -179,6 +179,8 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 **35 indicators available** in the catalog (`src/strategies/custom/catalog.ts`): rsi, ema, supertrend, bollingerBands, obv, vwap, cmf, williamsR, cci, roc, ad, mfi, psar, ao, movingAverage, trix, volumeOscillator, macd, pmax, adx, donchian, stochastic, aroon, ichimoku, vortex, chandelier, keltner, starcBands, movingAverageEnvelope, atrTrailingStop, pmo, kdj, stochRsi, volumeSma, atrRatio.
 
 **AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — uses an OpenAI-compatible endpoint to generate, validate, and save a strategy JSON.
+
+**Manual generation:** When the user asks to create or generate a strategy (without using `pnpm generate-strategy`), follow the spec in `STRATEGY_PROMPT.md` at the project root. It contains the full JSON schema, all 35 indicators with parameters and fields, value reference syntax, and examples. Write the JSON file directly to `strategies/` — it will be auto-discovered on the next backtest.
 
 ---
 

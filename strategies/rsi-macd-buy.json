@@ -13,27 +13,10 @@
   },
   "buy": {
     "mode": "all",
-    "conditions": [
-      [
-        "rsi",
-        "<",
-        30
-      ],
-      [
-        "macd.histogram",
-        ">",
-        0
-      ]
-    ]
+    "conditions": [["rsi", "<", 30], ["macd.histogram", ">", 0]]
   },
   "sell": {
     "mode": "any",
-    "conditions": [
-      [
-        "rsi",
-        ">",
-        70
-      ]
-    ]
+    "conditions": [["rsi", ">", 70]]
   }
 }

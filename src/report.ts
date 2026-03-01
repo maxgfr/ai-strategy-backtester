@@ -20,7 +20,9 @@ type SimulationResult = ParsedFilename & {
 type StrategyAverage = {
   strategy: string
   count: number
+  avgInitialCapital: number
   avgFinalCapital: number
+  avgTrades: number
   avgProfitPercent: number
   avgWinRate: number
   avgSharpe: number
@@ -81,8 +83,12 @@ function computeStrategyAverages(
   const averages: StrategyAverage[] = []
   for (const [strategy, group] of grouped) {
     const count = group.length
+    const avgInitialCapital =
+      group.reduce((s, r) => s + (r.data.initialCapital ?? 0), 0) / count
     const avgFinalCapital =
       group.reduce((s, r) => s + (r.data.lastPositionMoney ?? 0), 0) / count
+    const avgTrades =
+      group.reduce((s, r) => s + (r.data.nbPosition ?? 0), 0) / count
     const avgProfitPercent =
       group.reduce((s, r) => s + parsePercent(r.data.percentageProfit), 0) /
       count
@@ -97,7 +103,9 @@ function computeStrategyAverages(
     averages.push({
       strategy,
       count,
+      avgInitialCapital: round(avgInitialCapital),
       avgFinalCapital: round(avgFinalCapital),
+      avgTrades: round(avgTrades),
       avgProfitPercent: round(avgProfitPercent),
       avgWinRate: round(avgWinRate),
       avgSharpe: round(avgSharpe),
@@ -149,7 +157,9 @@ function generateHtml(results: SimulationResult[]): string {
         `<tr>
           <td><strong>${a.strategy.toUpperCase()}</strong></td>
           <td>${a.count}</td>
+          <td>$${a.avgInitialCapital.toLocaleString()}</td>
           <td>$${a.avgFinalCapital.toLocaleString()}</td>
+          <td>${a.avgTrades}</td>
           <td class="${colorClass(a.avgProfitPercent)}">${a.avgProfitPercent}%</td>
           <td>${a.avgWinRate}%</td>
           <td>${a.avgSharpe}</td>
@@ -227,7 +237,9 @@ function generateHtml(results: SimulationResult[]): string {
         <tr>
           <th>Strategy</th>
           <th>Simulations</th>
+          <th>Avg Initial Capital</th>
           <th>Avg Final Capital</th>
+          <th>Avg Trades</th>
           <th>Avg Profit vs HODL</th>
           <th>Avg Win Rate</th>
           <th>Avg Sharpe</th>
