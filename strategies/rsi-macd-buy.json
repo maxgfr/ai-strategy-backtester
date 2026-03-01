@@ -1,0 +1,39 @@
+{
+  "name": "rsi-macd-buy",
+  "description": "Buy when RSI is oversold and MACD histogram is positive",
+  "indicators": {
+    "rsi": {
+      "period": 14
+    },
+    "macd": {
+      "fast": 12,
+      "slow": 26,
+      "signal": 9
+    }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      [
+        "rsi",
+        "<",
+        30
+      ],
+      [
+        "macd.histogram",
+        ">",
+        0
+      ]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      [
+        "rsi",
+        ">",
+        70
+      ]
+    ]
+  }
+}
