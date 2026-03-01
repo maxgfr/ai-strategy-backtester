@@ -1,3 +1,4 @@
+import { exec } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -452,5 +453,8 @@ const isDirectExecution =
     fileURLToPath(import.meta.url).replace(/\.ts$/, '')
 
 if (isDirectExecution) {
-  generateReport()
+  const reportPath = generateReport()
+  if (reportPath) {
+    exec(`open "${reportPath}"`)
+  }
 }
