@@ -243,11 +243,19 @@ async function runWorkerPool(
   maxWorkers: number,
 ): Promise<void> {
   let nextIndex = 0
+  let completed = 0
+  const total = tasks.length
 
   async function lane(): Promise<void> {
     while (nextIndex < tasks.length) {
       const task = tasks[nextIndex++]
+      const taskStart = Date.now()
       await spawnWorker(task)
+      completed++
+      const elapsed = ((Date.now() - taskStart) / 1000).toFixed(1)
+      logger.info(
+        `[${completed}/${total}] ${task.strategyName} (${task.interval}) completed in ${elapsed}s`,
+      )
     }
   }
 
@@ -266,13 +274,18 @@ export async function runSimulation(
   profileFilter?: string,
 ): Promise<void> {
   const config = loadConfig(configPath)
-  logger.info('Running simulation')
+  const simulationStart = Date.now()
+  logger.info('Starting simulation')
   cleanFilesOfFolder([config.paths.dbFolder], ['.gitkeep', '.gitignore'])
 
   if (params) {
     const firstProfile = config.simulation.profiles[0]
     const defaultStrategy = resolveStrategiesForProfile(firstProfile)[0]
     const strategyName = params.strategy ?? defaultStrategy
+    logger.info(
+      `Running single backtest: ${strategyName} on ${params.pair} ${params.interval}`,
+    )
+    const singleStart = Date.now()
     await runSingleSimulation(
       params.interval,
       params.pair,
@@ -283,8 +296,9 @@ export async function runSimulation(
       config,
       firstProfile?.maxArraySize,
     )
+    const singleElapsed = ((Date.now() - singleStart) / 1000).toFixed(1)
     logger.info(
-      `Simulation with pair '${params.pair}', interval '${params.interval}', strategy '${strategyName}' finished`,
+      `Backtest ${strategyName} (${params.pair} ${params.interval}) completed in ${singleElapsed}s`,
     )
   } else {
     const pair = config.trading.pair
@@ -322,8 +336,9 @@ export async function runSimulation(
       }
 
       logger.info(
-        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods x ${profile.dates.length} date ranges`,
+        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods (${profile.periods.join(', ')}) x ${profile.dates.length} date ranges`,
       )
+      logger.info(`  Strategies: ${strategies.join(', ')}`)
 
       const combinations = strategies.flatMap((strategyName) =>
         profile.periods.flatMap((period) =>
@@ -373,14 +388,15 @@ export async function runSimulation(
     }
 
     // Pre-download unique data files to avoid race conditions between workers
-    logger.info(
-      `Pre-downloading ${uniqueData.size} unique data files before worker dispatch`,
-    )
+    logger.info(`Downloading ${uniqueData.size} unique data files...`)
+    const downloadStart = Date.now()
     await Promise.all(
       Array.from(uniqueData.entries()).map(([key, d]) =>
         readAndLoadData(d.interval, d.pair, d.start, d.end, `data/${key}.json`),
       ),
     )
+    const downloadElapsed = ((Date.now() - downloadStart) / 1000).toFixed(1)
+    logger.info(`Data download completed in ${downloadElapsed}s`)
 
     const maxWorkers = availableParallelism()
     logger.info(
@@ -390,5 +406,6 @@ export async function runSimulation(
     await runWorkerPool(allCombinations, maxWorkers)
   }
 
-  logger.info('Simulation finished')
+  const totalElapsed = ((Date.now() - simulationStart) / 1000).toFixed(1)
+  logger.info(`Simulation finished in ${totalElapsed}s`)
 }

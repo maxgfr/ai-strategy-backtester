@@ -3,23 +3,32 @@ import { loadConfig } from './config'
 
 const config = loadConfig()
 
-export const logger = winston.createLogger({
-  format: winston.format.combine(
-    winston.format.timestamp({
-      format: 'DD/MM/YYYY HH:mm:ss',
-    }),
-    winston.format.printf(
-      (info) =>
-        `${JSON.stringify({
-          date: info.timestamp,
-          level: info.level,
-          message: info.message,
-          ...(info.splat !== undefined ? { splat: `${info.splat}` } : {}),
-        })},`,
-    ),
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'HH:mm:ss' }),
+  winston.format.printf((info) => {
+    const level = info.level.toUpperCase().padEnd(5)
+    return `${info.timestamp} ${level} ${info.message}`
+  }),
+)
+
+const fileFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'DD/MM/YYYY HH:mm:ss' }),
+  winston.format.printf(
+    (info) =>
+      `${JSON.stringify({
+        date: info.timestamp,
+        level: info.level,
+        message: info.message,
+      })}`,
   ),
+)
+
+export const logger = winston.createLogger({
   transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: config.paths.logFile }),
+    new winston.transports.Console({ format: consoleFormat }),
+    new winston.transports.File({
+      filename: config.paths.logFile,
+      format: fileFormat,
+    }),
   ],
 })
