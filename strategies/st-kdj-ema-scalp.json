@@ -1,22 +1,21 @@
 {
   "name": "st-kdj-ema-scalp",
-  "description": "KDJ J-line extreme recovery + fast EMA crossover — catches V-reversals when fast EMA crosses above slow EMA with volume spike",
+  "description": "KDJ J-line oversold recovery in Supertrend uptrend — catches V-reversals with volume spike, exits only on trend break",
   "indicators": {
-    "kdj": { "rsvPeriod": 5, "kPeriod": 2, "dPeriod": 2 },
-    "emaFast": { "_type": "ema", "period": 5 },
-    "emaSlow": { "_type": "ema", "period": 13 },
-    "volumeSma": { "period": 10 }
+    "kdj": { "rsvPeriod": 9, "kPeriod": 3, "dPeriod": 3 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "volumeSma": { "period": 20 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
+      ["close", ">", "supertrend"],
       ["kdj.j", "<", 20],
-      ["emaFast", ">", "emaSlow"],
       ["volume", ">", "volumeSma"]
     ]
   },
   "sell": {
-    "mode": "any",
-    "conditions": [["kdj.j", ">", 80], ["emaFast", "<", "emaSlow"]]
+    "mode": "all",
+    "conditions": [["close", "<", "supertrend"]]
   }
 }

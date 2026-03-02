@@ -1,26 +1,31 @@
 {
   "name": "st-vwap-momentum",
-  "description": "VWAP-gated momentum scalper — price above VWAP as baseline, score mode with ROC, MFI, volume, and RSI for entry confirmation",
+  "description": "VWAP and Supertrend gated momentum — requires uptrend and price above VWAP, scores momentum indicators, exits on trend break",
   "indicators": {
     "vwap": {},
-    "roc": { "period": 5 },
-    "mfi": { "period": 7 },
-    "volumeSma": { "period": 10 },
-    "rsi": { "period": 7 }
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "roc": { "period": 10 },
+    "mfi": { "period": 14 },
+    "volumeSma": { "period": 20 },
+    "rsi": { "period": 10 }
   },
   "buy": {
     "mode": "score",
-    "threshold": 2,
-    "required": [["close", ">", "vwap"]],
+    "threshold": 3,
+    "required": [["close", ">", "vwap"], ["close", ">", "supertrend"]],
     "scored": [
       ["roc", ">", 0],
       ["mfi", "<", 40],
       ["volume", ">", "volumeSma"],
-      ["rsi", "<", 45]
+      ["rsi", "<", 40]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["close", "<", "vwap"], ["rsi", ">", 75], ["mfi", ">", 80]]
+    "conditions": [
+      ["close", "<", "supertrend"],
+      ["rsi", ">", 75],
+      ["mfi", ">", 85]
+    ]
   }
 }

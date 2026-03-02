@@ -1,14 +1,16 @@
 {
   "name": "st-scalp-rsi-bb",
-  "description": "Bollinger Band mean reversion scalper — buy near lower band when RSI oversold and volume spikes above average, sell at middle band or RSI overbought",
+  "description": "BB mean reversion in Supertrend uptrend — buy near lower BB when RSI oversold with volume spike, exit on trend break or upper BB",
   "indicators": {
-    "bollingerBands": { "period": 12, "stdDev": 2 },
-    "rsi": { "period": 7 },
-    "volumeSma": { "period": 10 }
+    "bollingerBands": { "period": 20, "stdDev": 2 },
+    "rsi": { "period": 10 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "volumeSma": { "period": 20 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
+      ["close", ">", "supertrend"],
       ["close", "<", "bollingerBands.lower"],
       ["rsi", "<", 30],
       ["volume", ">", "volumeSma"]
@@ -16,6 +18,10 @@
   },
   "sell": {
     "mode": "any",
-    "conditions": [["close", ">", "bollingerBands.middle"], ["rsi", ">", 70]]
+    "conditions": [
+      ["close", "<", "supertrend"],
+      ["close", ">", "bollingerBands.upper"],
+      ["rsi", ">", 75]
+    ]
   }
 }

@@ -263,6 +263,7 @@ function resolveStrategiesForProfile(profile: SimulationProfile): string[] {
 export async function runSimulation(
   params?: SimulationParams,
   configPath?: string,
+  profileFilter?: string,
 ): Promise<void> {
   const config = loadConfig(configPath)
   logger.info('Running simulation')
@@ -294,7 +295,23 @@ export async function runSimulation(
       { interval: BinanceInterval; pair: string; start: Date; end: Date }
     >()
 
-    for (const profile of config.simulation.profiles) {
+    const profiles = profileFilter
+      ? config.simulation.profiles.filter((p) => p.name === profileFilter)
+      : config.simulation.profiles
+
+    if (profileFilter && profiles.length === 0) {
+      const available = config.simulation.profiles.map((p) => p.name).join(', ')
+      logger.error(
+        `Profile "${profileFilter}" not found. Available profiles: ${available}`,
+      )
+      return
+    }
+
+    if (profileFilter) {
+      logger.info(`Filtering to profile: ${profileFilter}`)
+    }
+
+    for (const profile of profiles) {
       const strategies = resolveStrategiesForProfile(profile)
 
       if (strategies.length === 0) {

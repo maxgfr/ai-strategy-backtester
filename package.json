@@ -10,6 +10,10 @@
   "scripts": {
     "backtest": "tsx src/backtest.ts",
     "backtest:report": "tsx src/backtest.ts --report",
+    "backtest:long": "tsx src/backtest.ts --profile longTerm",
+    "backtest:long:report": "tsx src/backtest.ts --report --profile longTerm",
+    "backtest:short": "tsx src/backtest.ts --profile shortTerm",
+    "backtest:short:report": "tsx src/backtest.ts --report --profile shortTerm",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

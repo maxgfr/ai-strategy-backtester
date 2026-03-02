@@ -1,22 +1,27 @@
 {
   "name": "st-donchian-micro",
-  "description": "Micro Donchian breakout — 20-period breakout entry with 5-period trailing exit, ADX trending filter and volume confirmation",
+  "description": "Donchian breakout in Supertrend uptrend — wider breakout channel with ADX and volume, exits on trend break or trailing channel",
   "indicators": {
-    "breakout": { "_type": "donchian", "period": 20 },
-    "exit": { "_type": "donchian", "period": 5 },
-    "adx": { "period": 10 },
-    "volumeSma": { "period": 10 }
+    "breakout": { "_type": "donchian", "period": 30 },
+    "exit": { "_type": "donchian", "period": 10 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "adx": { "period": 14 },
+    "volumeSma": { "period": 20 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
+      ["close", ">", "supertrend"],
       ["close", ">", "breakout.upper[-1]"],
       ["adx.adx", ">", 20],
       ["volume", ">", "volumeSma"]
     ]
   },
   "sell": {
-    "mode": "all",
-    "conditions": [["close", "<", "exit.lower[-1]"]]
+    "mode": "any",
+    "conditions": [
+      ["close", "<", "supertrend"],
+      ["close", "<", "exit.lower[-1]"]
+    ]
   }
 }

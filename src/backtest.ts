@@ -23,6 +23,13 @@ if (configFlagIndex !== -1) {
   args.splice(configFlagIndex, 2)
 }
 
+const profileFlagIndex = args.indexOf('--profile')
+let profileFilter: string | undefined
+if (profileFlagIndex !== -1) {
+  profileFilter = args[profileFlagIndex + 1]
+  args.splice(profileFlagIndex, 2)
+}
+
 const [pair, interval, startDateStr, endDateStr, strategy] = args
 
 const params =
@@ -36,7 +43,7 @@ const params =
       }
     : undefined
 
-await runSimulation(params, configPath)
+await runSimulation(params, configPath, profileFilter)
 
 const reportPath = generateReport()
 if (reportPath && openReport) {

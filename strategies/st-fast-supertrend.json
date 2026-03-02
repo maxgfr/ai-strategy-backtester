@@ -1,21 +1,21 @@
 {
   "name": "st-fast-supertrend",
-  "description": "Fast Supertrend trend follower — short ATR period and low multiplier for quick signals, confirmed by fast MACD and ADX trending",
+  "description": "Supertrend uptrend with RSI pullback entry — buy dips in confirmed trend, exit only on trend break",
   "indicators": {
-    "supertrend": { "atrPeriod": 5, "multiplier": 2 },
-    "macd": { "fast": 6, "slow": 13, "signal": 5 },
-    "adx": { "period": 10 }
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "rsi": { "period": 10 },
+    "adx": { "period": 14 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
       ["close", ">", "supertrend"],
-      ["macd.histogram", ">", 0],
+      ["rsi", "<", 35],
       ["adx.adx", ">", 20]
     ]
   },
   "sell": {
-    "mode": "any",
-    "conditions": [["close", "<", "supertrend"], ["macd.histogram", "<", 0]]
+    "mode": "all",
+    "conditions": [["close", "<", "supertrend"]]
   }
 }

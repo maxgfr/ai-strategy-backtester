@@ -1,17 +1,23 @@
 {
   "name": "st-psar-roc",
-  "description": "Fast Parabolic SAR trend flip + ROC momentum + CMF volume flow — catches quick reversals with institutional flow confirmation",
+  "description": "PSAR trend flip in Supertrend uptrend — standard PSAR with ROC momentum and CMF flow, exits on trend break or PSAR flip",
   "indicators": {
-    "psar": { "step": 0.03, "max": 0.25 },
-    "roc": { "period": 5 },
-    "cmf": { "period": 10 }
+    "psar": { "step": 0.02, "max": 0.2 },
+    "roc": { "period": 10 },
+    "cmf": { "period": 14 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 }
   },
   "buy": {
     "mode": "all",
-    "conditions": [["close", ">", "psar"], ["roc", ">", 0], ["cmf", ">", 0]]
+    "conditions": [
+      ["close", ">", "supertrend"],
+      ["close", ">", "psar"],
+      ["roc", ">", 0],
+      ["cmf", ">", 0]
+    ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["close", "<", "psar"], ["roc", "<", -1]]
+    "conditions": [["close", "<", "supertrend"], ["close", "<", "psar"]]
   }
 }
