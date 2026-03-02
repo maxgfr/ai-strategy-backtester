@@ -3,14 +3,13 @@ import type { CandleStick } from '../../types'
 import { stochastic } from '../stochastic'
 
 describe('stochastic', () => {
-  const candles: CandleStick[] = Array.from({ length: 30 }, (_, i) => ({
-    time: i,
-    open: 100 + Math.random() * 20,
-    high: 105 + Math.random() * 20,
-    low: 95 + Math.random() * 20,
-    close: 100 + Math.random() * 20,
-    volume: 1000,
-  }))
+  const candles: CandleStick[] = Array.from({ length: 30 }, (_, i) => {
+    const low = 95 + Math.random() * 20
+    const high = low + 5 + Math.random() * 15
+    const open = low + Math.random() * (high - low)
+    const close = low + Math.random() * (high - low)
+    return { time: i, open, high, low, close, volume: 1000 }
+  })
 
   it('calculates Stochastic values', () => {
     const result = stochastic(candles)
