@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import type { ZodError } from 'zod'
+import { RawConfigSchema } from './schemas/config'
 import type { BinanceInterval, DbSchema } from './types'
 
 export type DateRange = {
@@ -29,7 +31,6 @@ export type AppConfig = {
     readonly from: string
     readonly to: string
     readonly pair: string
-    readonly period: BinanceInterval
     readonly fees: number
     readonly initialCapital: number
   }
@@ -46,13 +47,7 @@ export type AppConfig = {
 
 type RawDateRange = { start: string; end: string }
 
-type RawGenerationConfig = {
-  enabled: boolean
-  model: string
-  baseUrl: string
-  maxTokens: number
-  temperature: number
-}
+type RawSimulation = { profiles: Record<string, RawProfile> } | RawProfile
 
 type RawProfile = {
   maxArraySize: number
@@ -62,25 +57,25 @@ type RawProfile = {
 }
 
 type RawConfig = {
-  trading: {
-    from: string
-    to: string
-    period: BinanceInterval
-    fees: number
-    initialCapital: number
+  trading: { from: string; to: string; fees: number; initialCapital: number }
+  simulation: RawSimulation
+  generation?: {
+    enabled: boolean
+    model: string
+    baseUrl: string
+    maxTokens: number
+    temperature: number
   }
-  simulation:
-    | {
-        profiles: Record<string, RawProfile>
-      }
-    | {
-        maxArraySize: number
-        periods: BinanceInterval[]
-        strategies: string[]
-        dates: RawDateRange[]
-      }
-  generation?: RawGenerationConfig
   paths: AppConfig['paths']
+}
+
+function formatZodError(error: ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''
+      return `  - ${path}${issue.message}`
+    })
+    .join('\n')
 }
 
 function resolveDate(value: string): Date {
@@ -119,9 +114,18 @@ function parseProfiles(raw: RawConfig['simulation']): SimulationProfile[] {
 
 export function loadConfig(path?: string): AppConfig {
   const configPath = path ?? resolve(process.cwd(), 'config.json')
-  const raw: RawConfig = JSON.parse(readFileSync(configPath, 'utf-8'))
+  const json = JSON.parse(readFileSync(configPath, 'utf-8'))
 
-  const defaultGeneration: RawGenerationConfig = {
+  const result = RawConfigSchema.safeParse(json)
+  if (!result.success) {
+    throw new Error(
+      `Invalid config (${configPath}):\n${formatZodError(result.error)}`,
+    )
+  }
+
+  const raw = result.data as RawConfig
+
+  const defaultGeneration: RawConfig['generation'] = {
     enabled: false,
     model: 'gpt-4o-mini',
     baseUrl: 'https://api.openai.com/v1',
@@ -145,11 +149,14 @@ export function loadConfig(path?: string): AppConfig {
   }
 }
 
-export function buildDbModel(config: AppConfig): DbSchema {
+export function buildDbModel(
+  config: AppConfig,
+  interval: BinanceInterval,
+): DbSchema {
   return {
     version: 1,
     initialParameters: {
-      period: config.trading.period,
+      period: interval,
       pair: config.trading.pair,
     },
     historicPosition: [],

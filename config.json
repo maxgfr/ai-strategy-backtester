@@ -2,7 +2,6 @@
   "trading": {
     "from": "ETH",
     "to": "USDT",
-    "period": "4h",
     "fees": 0.0026,
     "initialCapital": 10000
   },
@@ -18,7 +17,7 @@
         "maxArraySize": 3000,
         "periods": ["15m", "30m", "1h"],
         "strategies": ["st-*"],
-        "dates": [{ "start": "2025-06-01", "end": "2026-02-01" }]
+        "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
       }
     }
   },

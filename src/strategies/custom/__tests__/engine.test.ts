@@ -233,7 +233,7 @@ describe('validateStrategy', () => {
     }
     const result = validateStrategy(def)
     expect(result.valid).toBe(false)
-    expect(result.errors.some((e) => e.includes('Invalid operator'))).toBe(true)
+    expect(result.errors.some((e) => e.includes('Invalid option'))).toBe(true)
   })
 
   it('catches unknown fields on object indicators', () => {

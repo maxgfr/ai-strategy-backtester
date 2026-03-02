@@ -110,7 +110,7 @@ async function simulation(
   config: AppConfig,
   maxArraySize: number,
 ): Promise<void> {
-  const db = new Database(dbPath, buildDbModel(config))
+  const db = new Database(dbPath, buildDbModel(config, interval))
   const historic: Array<CandleStick> = await readAndLoadData(
     interval,
     pair,

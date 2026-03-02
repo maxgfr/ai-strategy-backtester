@@ -1,3 +1,5 @@
+import type { ZodError, ZodIssue } from 'zod'
+import { StrategyDefSchema } from '../../schemas/strategy'
 import type { CandleStick } from '../../types'
 import type { Signal, StrategyFn } from '../types'
 import { type CatalogEntry, catalog } from './catalog'
@@ -5,7 +7,6 @@ import type {
   Condition,
   CustomStrategyDef,
   IndicatorParams,
-  Op,
   ScoreSignalBlock,
   SignalBlock,
   SimpleSignalBlock,
@@ -13,7 +14,6 @@ import type {
 } from './types'
 
 const CANDLE_FIELDS = new Set(['close', 'high', 'low', 'open', 'volume'])
-const VALID_OPS = new Set<Op>(['>', '<', '>=', '<=', '==', '!='])
 
 type IndicatorCache = Map<string, unknown[]>
 
@@ -209,12 +209,33 @@ function collectValueRefs(block: SignalBlock): ValueRef[] {
   return refs
 }
 
-function collectConditions(block: SignalBlock): Condition[] {
-  if (block.mode === 'score') {
-    const sb = block as ScoreSignalBlock
-    return [...(sb.required ?? []), ...sb.scored]
+function flattenZodIssues(
+  issues: ZodIssue[],
+  parentPath: (string | number)[] = [],
+): { message: string; path: (string | number)[] }[] {
+  const flat: { message: string; path: (string | number)[] }[] = []
+  for (const issue of issues) {
+    const fullPath = [...parentPath, ...(issue.path as (string | number)[])]
+    if (issue.code === 'invalid_union' && 'errors' in issue) {
+      // Pick the union branch with the fewest errors (best match)
+      const branches = issue.errors as ZodIssue[][]
+      let best = branches[0] ?? []
+      for (const branch of branches) {
+        if (branch.length < best.length) best = branch
+      }
+      flat.push(...flattenZodIssues(best, fullPath))
+    } else {
+      flat.push({ message: issue.message, path: fullPath })
+    }
   }
-  return (block as SimpleSignalBlock).conditions
+  return flat
+}
+
+function formatZodErrors(error: ZodError): string[] {
+  return flattenZodIssues(error.issues).map(({ message, path }) => {
+    const loc = path.length > 0 ? ` at ${path.join('.')}` : ''
+    return `${message}${loc}`
+  })
 }
 
 export function validateStrategy(
@@ -223,67 +244,26 @@ export function validateStrategy(
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = []
 
-  if (!def.name || typeof def.name !== 'string') {
-    errors.push('Missing or invalid "name"')
-  }
-  if (!def.description || typeof def.description !== 'string') {
-    errors.push('Missing or invalid "description"')
+  // Structural validation via Zod
+  const parseResult = StrategyDefSchema.safeParse(def)
+  if (!parseResult.success) {
+    errors.push(...formatZodErrors(parseResult.error))
+    return { valid: false, errors }
   }
 
-  // Build alias → catalog name mapping for validation
+  // Semantic validation: check indicators exist in catalog
   const aliasMap = new Map<string, string>()
-  if (!def.indicators || typeof def.indicators !== 'object') {
-    errors.push('Missing or invalid "indicators"')
-  } else {
-    for (const [alias, params] of Object.entries(def.indicators)) {
-      const catalogName = resolveIndicatorName(alias, params)
-      aliasMap.set(alias, catalogName)
-      if (!cat[catalogName]) {
-        errors.push(`Unknown indicator: "${catalogName}" (alias: "${alias}")`)
-      }
+  for (const [alias, params] of Object.entries(def.indicators)) {
+    const catalogName = resolveIndicatorName(alias, params)
+    aliasMap.set(alias, catalogName)
+    if (!cat[catalogName]) {
+      errors.push(`Unknown indicator: "${catalogName}" (alias: "${alias}")`)
     }
   }
 
+  // Semantic validation: check value references resolve to declared indicators/fields
   for (const blockName of ['buy', 'sell'] as const) {
     const block = def[blockName]
-    if (!block) {
-      errors.push(`Missing "${blockName}" block`)
-      continue
-    }
-
-    if (!['all', 'any', 'score'].includes(block.mode)) {
-      errors.push(`Invalid mode "${block.mode}" in ${blockName} block`)
-    }
-
-    if (block.mode === 'score') {
-      const sb = block as ScoreSignalBlock
-      if (typeof sb.threshold !== 'number') {
-        errors.push(`Missing "threshold" in ${blockName} score block`)
-      }
-      if (!Array.isArray(sb.scored) || sb.scored.length === 0) {
-        errors.push(`Missing or empty "scored" in ${blockName} score block`)
-      }
-    } else {
-      const sb = block as SimpleSignalBlock
-      if (!Array.isArray(sb.conditions) || sb.conditions.length === 0) {
-        errors.push(`Missing or empty "conditions" in ${blockName} block`)
-      }
-    }
-
-    const conditions = collectConditions(block)
-    for (const cond of conditions) {
-      if (!Array.isArray(cond) || cond.length !== 3) {
-        errors.push(
-          `Invalid condition format in ${blockName}: expected [left, op, right]`,
-        )
-        continue
-      }
-      const [, op] = cond
-      if (!VALID_OPS.has(op as Op)) {
-        errors.push(`Invalid operator "${op}" in ${blockName} condition`)
-      }
-    }
-
     const refs = collectValueRefs(block)
     for (const ref of refs) {
       if (typeof ref === 'number') continue
@@ -295,14 +275,12 @@ export function validateStrategy(
         continue
       }
 
-      // Check if indicator is declared (either directly or as alias)
       const catalogName = aliasMap.get(parsed.indicator)
       if (!catalogName && !def.indicators[parsed.indicator]) {
         errors.push(
           `Reference "${ref}" uses undeclared indicator "${parsed.indicator}" in ${blockName}`,
         )
       }
-      // Validate field exists on catalog entry
       const entryName = catalogName ?? parsed.indicator
       const entry = cat[entryName]
       if (entry && parsed.field && entry.fields) {

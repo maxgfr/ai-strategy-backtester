@@ -10,7 +10,7 @@
 
 Crypto strategy backtester using Binance historical data. Entry point is a plain script (no HTTP server). Fetches historical OHLCV data, applies technical analysis strategies, and runs backtests. Results are persisted locally as JSON files. AI can generate strategies from natural language.
 
-**Active stack:** Node 24 · TypeScript 5.9 · pnpm 10.30 · tsx · Vitest · Biome · Binance Historical API
+**Active stack:** Node 24 · TypeScript 5.9 · pnpm 10.30 · tsx · Vitest · Biome · Zod 4 · Binance Historical API
 
 ---
 
@@ -50,8 +50,12 @@ src/
 │   └── custom/             # Declarative JSON strategy engine
 │       ├── types.ts        # Schema types (CustomStrategyDef, SignalBlock, Condition)
 │       ├── catalog.ts      # Indicator name → wrapper fn + metadata (35 indicators)
-│       ├── engine.ts       # JSON → StrategyFn interpreter + validator
+│       ├── engine.ts       # JSON → StrategyFn interpreter + validator (Zod + semantic)
 │       └── loader.ts       # Discover & load JSON files from strategies/
+├── schemas/                # Zod validation schemas
+│   ├── config.ts           # Config JSON schema (trading, simulation, generation, paths)
+│   ├── strategy.ts         # Strategy JSON schema (name, indicators, signal blocks)
+│   └── index.ts            # Re-exports
 └── indicators/             # Technical analysis — pure functions, no side effects
     ├── index.ts            # Indicator exports
     ├── primitives/         # Internal building blocks (sma, ema, rma, stdev, etc.)
@@ -114,7 +118,6 @@ All configuration is externalized in `config.json` at the project root. Loaded b
 | Field | Default | Description |
 |---|---|---|
 | `trading.from` / `trading.to` | `ETH` / `USDT` | Trading pair (combined as `ETHUSDT`) |
-| `trading.period` | `4h` | Candlestick interval |
 | `trading.fees` | `0.0026` | Trading fees (0.26%) |
 | `trading.initialCapital` | `10000` | Starting capital |
 
@@ -297,6 +300,7 @@ When creating or reviewing strategies, apply these proven insights:
 - **No `console.log`**: use `logger` from `./logger` (winston)
 - **Database** is a plain `fs.readFileSync`/`writeFileSync` JSON store (`src/database.ts`), no external DB dependency
 - **Data fetching** uses `binance-historical` package to download OHLCV klines
+- **Validation**: Config validated at startup via Zod (`src/schemas/config.ts`). Strategy JSON validated structurally via Zod (`src/schemas/strategy.ts`) + semantically in `engine.ts` (catalog existence, field resolution)
 
 ---
 
