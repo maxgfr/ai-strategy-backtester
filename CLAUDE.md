@@ -23,13 +23,15 @@ strategies/                          # ALL strategies as JSON (no TS strategies)
 ├── turtle.json                      # Turtle Trading (long-term)
 ├── confluence.json                  # Multi-indicator scoring (long-term)
 ├── rsi-macd-buy.json                # RSI oversold + MACD buy (long-term)
+├── rsi-macd-trend-ride.json         # RSI oversold + MACD buy, RSI > 80 exit (long-term) ★ BEST
 ├── breakout-volume.json             # Donchian breakout + volume (long-term)
+├── supertrend-pullback-momentum.json # Supertrend dip buyer (long-term)
+├── stochrsi-trend-filter.json       # StochRSI trend filtered (long-term)
+├── atr-trailing-vortex.json         # Vortex + ATR trailing (long-term)
+├── kdj-extreme-recovery.json        # KDJ J-line recovery (long-term)
 ├── st-scalp-rsi-bb.json            # BB mean reversion scalper (short-term)
-├── st-stochrsi-keltner.json        # StochRSI + Keltner scalper (short-term)
 ├── st-fast-supertrend.json         # Fast Supertrend + MACD (short-term)
 ├── st-vwap-momentum.json           # VWAP-gated momentum (short-term)
-├── st-donchian-micro.json          # Micro Donchian breakout (short-term)
-├── st-psar-roc.json                # Fast PSAR + ROC + CMF (short-term)
 └── st-kdj-ema-scalp.json           # KDJ + EMA crossover scalp (short-term)
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
@@ -133,8 +135,8 @@ Config supports named simulation profiles under `simulation.profiles`. Each prof
 | `simulation.profiles.<name>.dates` | Date range array for backtesting |
 
 **Default profiles:**
-- `longTerm`: periods `4h/6h/8h`, strategies `*` (all non-st-), dates 2022-01-01 to 2026-02-01
-- `shortTerm`: periods `15m/30m/1h`, strategies `st-*`, dates 2025-06-01 to 2026-02-01
+- `longTerm`: periods `4h/6h/12h`, strategies `*` (all non-st-), dates 2022-01-01 to 2026-02-01
+- `shortTerm`: periods `30m/1h/2h`, strategies `st-*`, dates 2022-01-01 to 2026-02-01
 
 ### Generation (AI Strategy Generation)
 
@@ -172,16 +174,13 @@ Optimized for 4h/6h/8h timeframes. Selected by pattern `"*"` (all non-`st-` pref
 | **Supertrend** | `supertrend.json` | ATR-based trend-following — buy when close > supertrend |
 | **Turtle** | `turtle.json` | 200-period Donchian breakout entry, 10-period trailing stop exit (uses `_type` aliasing) |
 | **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume + ATR + EMA). Score mode with threshold. |
-| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive entry, RSI overbought exit |
+| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive entry, RSI > 70 exit |
+| **RSI-MACD Trend Ride** | `rsi-macd-trend-ride.json` | RSI oversold + MACD positive entry, RSI > 80 exit — holds longer for bigger gains ★ BEST |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX trending + volume confirmation |
 | **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover (oversold zone) in Supertrend uptrend + ADX + MACD — optimized for 6h |
 | **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend uptrend + RSI below 50 pullback + MACD positive + ADX — buy-the-dip, optimized for 6h |
 | **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex VI+/VI- crossover + ATR trailing stop exit + ADX + MACD — trend inception with dynamic trailing stop |
 | **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery from extreme oversold (< 0 to > 20) in Supertrend uptrend — catches V-shaped reversals |
-| **Williams Extreme Momentum** | `williams-extreme-momentum.json` | Williams %R extreme oversold (< -80) + MACD positive — panic bottom detector |
-| **Dual Supertrend** | `dual-supertrend.json` | Two Supertrend instances (factor 2 fast + factor 7 slow) must both confirm — dual trend filter |
-| **Triple Trend Gate** | `triple-trend-gate.json` | PMAX + Supertrend + Aroon all bullish (required) + score mode RSI/MACD/Volume filters |
-| **Volume Breakout CMF** | `volume-breakout-cmf.json` | CMF positive (institutional flow) + volume above SMA + Supertrend UP + ADX trending |
 
 ### Short-Term Strategies
 
@@ -190,11 +189,8 @@ Optimized for 15m/30m/1h timeframes. Prefixed with `st-`, selected by pattern `"
 | Strategy | File | Description |
 |----------|------|-------------|
 | **ST Scalp RSI BB** | `st-scalp-rsi-bb.json` | BB(12) mean reversion + RSI(7) oversold + volume spike above SMA(10) |
-| **ST StochRSI Keltner** | `st-stochrsi-keltner.json` | StochRSI(7) oversold near Keltner(10) lower band + volume confirmation |
 | **ST Fast Supertrend** | `st-fast-supertrend.json` | Fast Supertrend(5,2) + fast MACD(6,13,5) + ADX(10) trend filter |
 | **ST VWAP Momentum** | `st-vwap-momentum.json` | VWAP gate + score mode with ROC(5)/MFI(7)/volumeSma(10)/RSI(7) |
-| **ST Donchian Micro** | `st-donchian-micro.json` | 20-period breakout entry, 5-period trailing exit + ADX(10) + volume |
-| **ST PSAR ROC** | `st-psar-roc.json` | Fast PSAR(0.03,0.25) trend flip + ROC(5) momentum + CMF(10) flow |
 | **ST KDJ EMA Scalp** | `st-kdj-ema-scalp.json` | KDJ(5,2,2) J-extreme recovery + EMA(5)/EMA(13) crossover + volume |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories. Each returns `Signal = 'buy' | 'sell' | null`.
@@ -235,7 +231,7 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
   - **Category comparison cards** (best long-term vs best short-term side by side)
   - **Filter buttons** (All / Long-Term / Short-Term) to toggle rankings and averages tables
   - **Category badges** on each row showing Short-Term (blue) or Long-Term (green)
-  - Classification based on interval: 1m/3m/5m/15m/30m/1h = Short-Term, 4h+ = Long-Term
+  - Classification based on interval: 1m/3m/5m/15m/30m/1h/2h = Short-Term, 4h+ = Long-Term
 
 ---
 

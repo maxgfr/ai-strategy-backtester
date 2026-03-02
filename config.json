@@ -9,13 +9,13 @@
     "profiles": {
       "longTerm": {
         "maxArraySize": 1000,
-        "periods": ["4h", "6h", "8h"],
+        "periods": ["4h", "6h", "12h"],
         "strategies": ["*"],
         "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
       },
       "shortTerm": {
         "maxArraySize": 3000,
-        "periods": ["15m", "30m", "1h"],
+        "periods": ["30m", "1h", "2h"],
         "strategies": ["st-*"],
         "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
       }

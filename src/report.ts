@@ -21,7 +21,15 @@ type ParsedFilename = {
   endDate: string
 }
 
-const SHORT_TERM_INTERVALS = new Set(['1m', '3m', '5m', '15m', '30m', '1h'])
+const SHORT_TERM_INTERVALS = new Set([
+  '1m',
+  '3m',
+  '5m',
+  '15m',
+  '30m',
+  '1h',
+  '2h',
+])
 
 function classifyInterval(interval: string): 'Short-Term' | 'Long-Term' {
   return SHORT_TERM_INTERVALS.has(interval) ? 'Short-Term' : 'Long-Term'
