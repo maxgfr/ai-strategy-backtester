@@ -171,10 +171,7 @@ function computeIndicators(
 }
 
 export function createCustomStrategy(def: CustomStrategyDef): StrategyFn {
-  return (
-    data: CandleStick[],
-    positionType?: PositionType,
-  ): Signal | null => {
+  return (data: CandleStick[], positionType?: PositionType): Signal | null => {
     if (data.length === 0) return null
 
     const { cache, aliasMap } = computeIndicators(data, def.indicators)
