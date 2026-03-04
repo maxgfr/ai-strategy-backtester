@@ -145,8 +145,8 @@ async function simulation(
 
     const dataWindow = window.slice(Math.max(window.length - maxArraySize, 0))
 
-    const signal = strategy(dataWindow)
     const lastPosition = db.get('position')
+    const signal = strategy(dataWindow, lastPosition.type)
 
     if (signal === 'buy' && lastPosition.type !== 'buy') {
       executeBuy(price, date, db, fees)

@@ -1,7 +1,7 @@
 import type { ZodError, ZodIssue } from 'zod'
 import { StrategyDefSchema } from '../../schemas/strategy'
 import type { CandleStick } from '../../types'
-import type { Signal, StrategyFn } from '../types'
+import type { PositionType, Signal, StrategyFn } from '../types'
 import { type CatalogEntry, catalog } from './catalog'
 import type {
   Condition,
@@ -171,18 +171,24 @@ function computeIndicators(
 }
 
 export function createCustomStrategy(def: CustomStrategyDef): StrategyFn {
-  return (data: CandleStick[]): Signal | null => {
+  return (
+    data: CandleStick[],
+    positionType?: PositionType,
+  ): Signal | null => {
     if (data.length === 0) return null
 
     const { cache, aliasMap } = computeIndicators(data, def.indicators)
     const candle = data[data.length - 1]
 
-    // Buy takes priority over sell if both conditions are met
-    if (evaluateSignalBlock(def.buy, candle, cache, aliasMap)) {
-      return 'buy'
-    }
-    if (evaluateSignalBlock(def.sell, candle, cache, aliasMap)) {
-      return 'sell'
+    // Evaluate signals based on current position state to avoid shadowing:
+    // - When holding (positionType='buy'), only sell conditions are actionable
+    // - When flat (positionType='sell'), only buy conditions are actionable
+    // This matches NautilusTrader's if/elif structure where position guards
+    // prevent irrelevant signals from blocking relevant ones.
+    if (positionType === 'buy') {
+      if (evaluateSignalBlock(def.sell, candle, cache, aliasMap)) return 'sell'
+    } else {
+      if (evaluateSignalBlock(def.buy, candle, cache, aliasMap)) return 'buy'
     }
     return null
   }
