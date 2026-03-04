@@ -24,13 +24,13 @@ export function RMA({
     if (prevSum === undefined || Number.isNaN(prevSum)) {
       sum = sma.update(candle)?.value
     } else {
-      sum = exponent * candle.close + (1 - exponent) * (prevSum || 0)
+      sum = exponent * candle.close + (1 - exponent) * (prevSum ?? 0)
     }
 
     prevPrevSum = prevSum
     prevSum = sum
 
-    if (sum) {
+    if (sum !== undefined && !Number.isNaN(sum)) {
       return { time: candle.time, value: sum }
     }
   }

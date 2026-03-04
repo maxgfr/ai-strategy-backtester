@@ -46,7 +46,7 @@ describe('createCustomStrategy', () => {
     expect(fn(candles)).toBe('buy')
   })
 
-  it('sell takes priority over buy', () => {
+  it('when flat (no position), buy is evaluated', () => {
     const def: CustomStrategyDef = {
       name: 'test-priority',
       description: 'test',
@@ -56,7 +56,21 @@ describe('createCustomStrategy', () => {
     }
     const fn = createCustomStrategy(def)
     const candles = makeCandles(5)
-    expect(fn(candles)).toBe('sell')
+    // When flat (positionType undefined or 'sell'), buy is evaluated
+    expect(fn(candles)).toBe('buy')
+  })
+
+  it('when holding (positionType=buy), sell is evaluated', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-sell-when-holding',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '>', 0]] },
+      sell: { mode: 'all', conditions: [['close', '>', 0]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5)
+    expect(fn(candles, 'buy')).toBe('sell')
   })
 
   it('evaluates mode "any"', () => {

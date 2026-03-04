@@ -55,7 +55,7 @@ describe('JSON strategies via registry', () => {
           60 + i,
         ),
       )
-      expect(strategy([...uptrend, ...downtrend])).toBe('sell')
+      expect(strategy([...uptrend, ...downtrend], 'buy')).toBe('sell')
     })
   })
 
@@ -88,7 +88,7 @@ describe('JSON strategies via registry', () => {
           40 + i,
         ),
       )
-      expect(strategy([...uptrend, ...downtrend])).toBe('sell')
+      expect(strategy([...uptrend, ...downtrend], 'buy')).toBe('sell')
     })
   })
 
@@ -119,7 +119,7 @@ describe('JSON strategies via registry', () => {
         makeCandle(110, 115, 100, 108, 100, i),
       )
       const dropCandle = makeCandle(90, 92, 88, 95, 100, 201)
-      expect(strategy([...range, dropCandle])).toBe('sell')
+      expect(strategy([...range, dropCandle], 'buy')).toBe('sell')
     })
 
     it('returns null when price stays within channels', () => {

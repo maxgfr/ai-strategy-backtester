@@ -18,7 +18,7 @@ export function AD({ candles }: { candles: Candle[] }) {
         ? 0
         : ((candle.close - low - (high - candle.close)) / diff) * volume
     const prevAd = result.length > 0 ? result[result.length - 1].value : 0
-    return { time: candle.time, value: Math.round(prevAd + mfv) }
+    return { time: candle.time, value: prevAd + mfv }
   }
 
   for (const c of candles) {

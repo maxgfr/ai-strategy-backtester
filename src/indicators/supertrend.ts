@@ -33,33 +33,41 @@ export function supertrend(
 
   const finalUpperBand = []
   const finalLowerBand = []
-  let previousFinalUpperBand = 0
-  let previousFinalLowerBand = 0
   for (let i = 0; i < r.length; i++) {
+    if (i === 0) {
+      finalUpperBand.push(basicUpperBand[i])
+      finalLowerBand.push(basicLowerBand[i])
+      continue
+    }
+    const prevFinalUpper = finalUpperBand[i - 1]
+    const prevFinalLower = finalLowerBand[i - 1]
     if (
-      basicUpperBand[i] < previousFinalUpperBand ||
-      (r[i - 1] && r[i - 1].close > previousFinalUpperBand)
+      basicUpperBand[i] < prevFinalUpper ||
+      r[i - 1].close > prevFinalUpper
     ) {
       finalUpperBand.push(basicUpperBand[i])
     } else {
-      finalUpperBand.push(previousFinalUpperBand)
+      finalUpperBand.push(prevFinalUpper)
     }
     if (
-      basicLowerBand[i] > previousFinalLowerBand ||
-      (r[i - 1] && r[i - 1].close < previousFinalLowerBand)
+      basicLowerBand[i] > prevFinalLower ||
+      r[i - 1].close < prevFinalLower
     ) {
       finalLowerBand.push(basicLowerBand[i])
     } else {
-      finalLowerBand.push(previousFinalLowerBand)
+      finalLowerBand.push(prevFinalLower)
     }
-    previousFinalUpperBand = finalUpperBand[i]
-    previousFinalLowerBand = finalLowerBand[i]
   }
 
-  const result = []
-  let previousSuperTrend = 0
+  const result: number[] = []
   for (let i = 0; i < r.length; i++) {
-    let nowSuperTrend = 0
+    if (i === 0) {
+      // Default to lower band (bullish) for the first bar
+      result.push(finalLowerBand[i])
+      continue
+    }
+    const previousSuperTrend = result[i - 1]
+    let nowSuperTrend: number
     if (
       previousSuperTrend === finalUpperBand[i - 1] &&
       r[i].close <= finalUpperBand[i]
@@ -80,9 +88,10 @@ export function supertrend(
       r[i].close < finalLowerBand[i]
     ) {
       nowSuperTrend = finalUpperBand[i]
+    } else {
+      nowSuperTrend = finalLowerBand[i]
     }
     result.push(nowSuperTrend)
-    previousSuperTrend = result[i]
   }
 
   return result

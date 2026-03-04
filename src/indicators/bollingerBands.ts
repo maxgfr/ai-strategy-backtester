@@ -31,7 +31,8 @@ export function BollingerBands({
     const dev = stdDev * sd.value
     const upper = basis.value + dev
     const lower = basis.value - dev
-    const bbr = (candle.close - lower) / (upper - lower)
+    const range = upper - lower
+    const bbr = range === 0 ? 0.5 : (candle.close - lower) / range
 
     return { time: candle.time, value: bbr, candle }
   }

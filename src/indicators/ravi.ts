@@ -15,8 +15,6 @@ export function ravi(
     const shortSma =
       window.slice(longPeriod - shortPeriod).reduce((s, c) => s + c.close, 0) /
       shortPeriod
-    return longSma === 0
-      ? acc
-      : [...acc, Math.abs((shortSma - longSma) / longSma) * 100]
+    return [...acc, longSma === 0 ? 0 : Math.abs((shortSma - longSma) / longSma) * 100]
   }, [])
 }

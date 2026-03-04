@@ -33,7 +33,7 @@ export function RSI({
       } else {
         let RS = lastAvgGain.value / lastAvgLoss.value
         RS = Number.isNaN(RS) ? 0 : RS
-        currentRSI = Number.parseFloat((100 - 100 / (1 + RS)).toFixed(2))
+        currentRSI = 100 - 100 / (1 + RS)
       }
 
       return { time: candle.time, value: currentRSI, candle }

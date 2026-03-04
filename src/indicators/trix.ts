@@ -36,7 +36,7 @@ export function TRIX({
     const triple = e3.value
     let value: number | undefined
     if (prevTriple !== undefined) {
-      value = ((triple - prevTriple) / prevTriple) * 100
+      value = prevTriple === 0 ? 0 : ((triple - prevTriple) / prevTriple) * 100
     }
     prevTriple = triple
 

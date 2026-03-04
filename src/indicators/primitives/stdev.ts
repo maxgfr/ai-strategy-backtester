@@ -25,15 +25,8 @@ export function STDEV({
 
   function SUM(fst: number, snd: number) {
     const EPS = 1e-10
-    let res = fst + snd
-
-    if (isZero(res, EPS)) {
-      res = 0
-    } else if (isZero(res, 1e-4)) {
-      res = 15
-    }
-
-    return res
+    const res = fst + snd
+    return isZero(res, EPS) ? 0 : res
   }
 
   function calculate(

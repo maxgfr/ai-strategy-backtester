@@ -20,9 +20,7 @@ export function pmo(
 
   for (let i = 1; i < candles.length; i++) {
     const prevClose = candles[i - 1].close
-    if (prevClose === 0) continue
-
-    const roc1 = (candles[i].close / prevClose - 1) * 100
+    const roc1 = prevClose === 0 ? 0 : (candles[i].close / prevClose - 1) * 100
     ema1 = ema1 === undefined ? roc1 * 20 : ema1 + mult1 * (roc1 * 20 - ema1)
     pmoValue =
       pmoValue === undefined ? ema1 : pmoValue + mult2 * (ema1 - pmoValue)

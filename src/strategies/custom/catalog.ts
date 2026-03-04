@@ -139,7 +139,8 @@ function bollingerBandsObjectWrapper(
     const dev = stdDevMultiplier * sd.value
     const upper = basis.value + dev
     const lower = basis.value - dev
-    const bbr = upper === lower ? 0 : (c.close - lower) / (upper - lower)
+    const range = upper - lower
+    const bbr = range === 0 ? 0.5 : (c.close - lower) / range
     results.push({ upper, middle: basis.value, lower, bbr })
   }
   return results
