@@ -141,6 +141,8 @@ async function simulation(
       db.set('historicPosition', [])
     }
 
+    window.push(candle)
+
     const dataWindow = window.slice(Math.max(window.length - maxArraySize, 0))
 
     const signal = strategy(dataWindow)
@@ -151,8 +153,6 @@ async function simulation(
     } else if (signal === 'sell' && lastPosition.type !== 'sell') {
       executeSell(price, date, db, fees)
     }
-
-    window.push(candle)
 
     if (i === historic.length - 1) {
       let finalPosition = db.get('position')

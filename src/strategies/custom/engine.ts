@@ -177,12 +177,12 @@ export function createCustomStrategy(def: CustomStrategyDef): StrategyFn {
     const { cache, aliasMap } = computeIndicators(data, def.indicators)
     const candle = data[data.length - 1]
 
-    // Sell takes priority
-    if (evaluateSignalBlock(def.sell, candle, cache, aliasMap)) {
-      return 'sell'
-    }
+    // Buy takes priority over sell if both conditions are met
     if (evaluateSignalBlock(def.buy, candle, cache, aliasMap)) {
       return 'buy'
+    }
+    if (evaluateSignalBlock(def.sell, candle, cache, aliasMap)) {
+      return 'sell'
     }
     return null
   }
