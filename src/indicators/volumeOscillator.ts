@@ -24,11 +24,11 @@ export function volumeOscillator(
 
 // Rate of Change: ((close - close[n]) / close[n]) * 100
 export function rateOfChange(candles: CandleStick[], period = 14): number[] {
-  return candles.reduce<number[]>((acc, c, i) => {
-    if (i < period) return acc
+  const result: number[] = []
+  for (let i = period; i < candles.length; i++) {
     const prevClose = candles[i - period].close
-    return prevClose === 0
-      ? acc
-      : [...acc, ((c.close - prevClose) / prevClose) * 100]
-  }, [])
+    if (prevClose !== 0)
+      result.push(((candles[i].close - prevClose) / prevClose) * 100)
+  }
+  return result
 }

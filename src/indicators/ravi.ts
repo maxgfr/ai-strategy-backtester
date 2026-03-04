@@ -8,13 +8,16 @@ export function ravi(
   shortPeriod = 7,
   longPeriod = 65,
 ): number[] {
-  return candles.reduce<number[]>((acc, _, i) => {
-    if (i < longPeriod - 1) return acc
+  const result: number[] = []
+  for (let i = longPeriod - 1; i < candles.length; i++) {
     const window = candles.slice(i + 1 - longPeriod, i + 1)
     const longSma = window.reduce((s, c) => s + c.close, 0) / longPeriod
     const shortSma =
       window.slice(longPeriod - shortPeriod).reduce((s, c) => s + c.close, 0) /
       shortPeriod
-    return [...acc, longSma === 0 ? 0 : Math.abs((shortSma - longSma) / longSma) * 100]
-  }, [])
+    result.push(
+      longSma === 0 ? 0 : Math.abs((shortSma - longSma) / longSma) * 100,
+    )
+  }
+  return result
 }

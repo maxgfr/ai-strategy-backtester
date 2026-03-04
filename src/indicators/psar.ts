@@ -68,21 +68,21 @@ export function PSAR({
     }
 
     if (prevSar === undefined) {
-      sar = prevLow!
-      extreme = prevHigh!
+      sar = prevLow ?? low
+      extreme = prevHigh ?? high
       up = true
       accel = step
     } else {
       sar = sar + accel * (extreme - sar)
 
       if (up) {
-        sar = Math.min(sar, prevLow!, low)
+        sar = Math.min(sar, prevLow ?? low, low)
         if (high > extreme) {
           extreme = high
           accel = Math.min(accel + step, max)
         }
       } else {
-        sar = Math.max(sar, prevHigh!, high)
+        sar = Math.max(sar, prevHigh ?? high, high)
         if (low < extreme) {
           extreme = low
           accel = Math.min(accel + step, max)

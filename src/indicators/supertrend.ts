@@ -41,18 +41,12 @@ export function supertrend(
     }
     const prevFinalUpper = finalUpperBand[i - 1]
     const prevFinalLower = finalLowerBand[i - 1]
-    if (
-      basicUpperBand[i] < prevFinalUpper ||
-      r[i - 1].close > prevFinalUpper
-    ) {
+    if (basicUpperBand[i] < prevFinalUpper || r[i - 1].close > prevFinalUpper) {
       finalUpperBand.push(basicUpperBand[i])
     } else {
       finalUpperBand.push(prevFinalUpper)
     }
-    if (
-      basicLowerBand[i] > prevFinalLower ||
-      r[i - 1].close < prevFinalLower
-    ) {
+    if (basicLowerBand[i] > prevFinalLower || r[i - 1].close < prevFinalLower) {
       finalLowerBand.push(basicLowerBand[i])
     } else {
       finalLowerBand.push(prevFinalLower)

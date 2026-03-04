@@ -16,7 +16,8 @@ export function WWMA({
   const alpha = 1 / period
 
   function calculate(candle: Candle): WWMAResultItem {
-    const prev = result.length > 0 ? result[result.length - 1].value : candle.close
+    const prev =
+      result.length > 0 ? result[result.length - 1].value : candle.close
     return {
       time: candle.time,
       value: alpha * candle.close + (1 - alpha) * prev,

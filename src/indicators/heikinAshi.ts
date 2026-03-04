@@ -27,7 +27,7 @@ export function HeikinAshi({ candles }: { candles: Candle[] }) {
     const haOpen =
       prevOpen === undefined
         ? (open + candle.close) / 2
-        : (prevOpen + prevClose!) / 2
+        : (prevOpen + (prevClose ?? 0)) / 2
     const haHigh = Math.max(high, haOpen, haClose)
     const haLow = Math.min(low, haOpen, haClose)
 

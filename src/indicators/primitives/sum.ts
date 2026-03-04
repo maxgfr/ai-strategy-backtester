@@ -26,7 +26,7 @@ export function Sum({
     rollingSum += candle.close
 
     if (window.length > period) {
-      rollingSum -= window.shift()!
+      rollingSum -= window.shift() ?? 0
     }
 
     if (window.length < period) return undefined

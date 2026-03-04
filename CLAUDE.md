@@ -298,6 +298,22 @@ When creating or reviewing strategies, apply these proven insights:
 - **Data fetching** uses `binance-historical` package to download OHLCV klines
 - **Validation**: Config validated at startup via Zod (`src/schemas/config.ts`). Strategy JSON validated structurally via Zod (`src/schemas/strategy.ts`) + semantically in `engine.ts` (catalog existence, field resolution)
 
+### Code Quality Rules (Biome-enforced)
+- **No `!` non-null assertions** — use `?? fallback` instead (`lint/style/noNonNullAssertion`)
+- **No `[...acc, x]` in `.reduce()`** — use `for` loop + `.push()` for O(n) performance (`lint/performance/noAccumulatingSpread`)
+- **No `.toFixed()` on indicator values** — causes precision loss in downstream calculations
+- **No truthy/falsy checks on numbers** — use explicit `!== undefined` or `?? 0` (zero is a valid value)
+- **Division-by-zero** must always be handled (return 0, or 0.5 for BBR)
+
+### Indicator Implementation Rules (matching Python NautilusTrader)
+- **SMA seeding** for EMA/RMA: buffer `period` values, compute SMA as seed, then apply exponential formula
+- **EMA alpha** = `2 / (period + 1)`
+- **RMA/Wilder's alpha** = `1 / period`
+- **PMAX EMA input** is `hl2 = (high + low) / 2`, not `close`
+- **KDJ** uses SMA for K and D smoothing (not EMA)
+- **Supertrend** first bar defaults to basic bands (not 0)
+- **Strategy evaluation is position-aware**: when holding (`positionType='buy'`), only sell conditions are checked; when flat (`positionType='sell'` or undefined), only buy conditions are checked
+
 ---
 
 ## File Conventions

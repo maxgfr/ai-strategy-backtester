@@ -14,19 +14,21 @@ const COMPONENTS: ComponentConfig[] = [
 ]
 
 function rocArray(closes: number[], period: number): number[] {
-  return closes.reduce<number[]>((acc, c, i) => {
-    if (i < period) return acc
+  const result: number[] = []
+  for (let i = period; i < closes.length; i++) {
     const prev = closes[i - period]
-    return prev === 0 ? acc : [...acc, ((c - prev) / prev) * 100]
-  }, [])
+    if (prev !== 0) result.push(((closes[i] - prev) / prev) * 100)
+  }
+  return result
 }
 
 function smaArray(values: number[], period: number): number[] {
-  return values.reduce<number[]>((acc, _, i) => {
-    if (i < period - 1) return acc
+  const result: number[] = []
+  for (let i = period - 1; i < values.length; i++) {
     const slice = values.slice(i + 1 - period, i + 1)
-    return [...acc, slice.reduce((a, b) => a + b, 0) / period]
-  }, [])
+    result.push(slice.reduce((a, b) => a + b, 0) / period)
+  }
+  return result
 }
 
 // Pring Special K — weighted sum of multiple SMA-smoothed ROC components.
