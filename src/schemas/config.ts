@@ -23,15 +23,16 @@ const DateRangeSchema = z.object({
 })
 
 const ProfileSchema = z.object({
-  maxArraySize: z.number().int().positive(),
+  maxArraySize: z.number().int().positive().optional(),
   periods: z.array(BinanceIntervalSchema).nonempty(),
   strategies: z.array(z.string().min(1)).nonempty(),
   dates: z.array(DateRangeSchema).nonempty(),
 })
 
 const TradingSchema = z.object({
-  from: z.string().min(1),
-  to: z.string().min(1),
+  from: z.string().min(1).optional(),
+  to: z.string().min(1).optional(),
+  pairs: z.array(z.string().min(1)).nonempty().optional(),
   fees: z.number().min(0).max(1),
   initialCapital: z.number().positive(),
 })

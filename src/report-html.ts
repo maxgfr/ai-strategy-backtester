@@ -108,6 +108,7 @@ function buildBestCard(
         <h2 style="color: ${accentColor}">${label}</h2>
         <div class="best-grid">
           <div class="best-item"><span class="label">Strategy</span><span class="value">${best.strategy.toUpperCase()}</span></div>
+          <div class="best-item"><span class="label">Pair</span><span class="value">${best.pair}</span></div>
           <div class="best-item"><span class="label">Period</span><span class="value">${best.interval}</span></div>
           <div class="best-item"><span class="label">Dates</span><span class="value">${best.startDate} \u2192 ${best.endDate}</span></div>
           <div class="best-item"><span class="label">Initial Capital</span><span class="value">$${round(best.data.initialCapital ?? 0).toLocaleString()}</span></div>
@@ -469,23 +470,35 @@ function buildChartScript(
     });
   });
 
-  // Category filter buttons
-  var filterBtns = document.querySelectorAll('.filter-btn');
+  // Multi-dimension filter (category + pair)
+  var activeFilters = { category: 'all', pair: 'all' };
   var avgTable = document.getElementById('averages');
   var avgRows = avgTable ? avgTable.querySelectorAll('tbody tr') : [];
 
-  filterBtns.forEach(function(btn) {
+  function applyFilters() {
+    tbody.querySelectorAll('tr').forEach(function(row) {
+      var catMatch = activeFilters.category === 'all' || row.getAttribute('data-category') === activeFilters.category;
+      var pairMatch = activeFilters.pair === 'all' || row.getAttribute('data-pair') === activeFilters.pair;
+      row.classList.toggle('hidden-row', !(catMatch && pairMatch));
+    });
+    avgRows.forEach(function(row) {
+      var catMatch = activeFilters.category === 'all' || row.getAttribute('data-category') === activeFilters.category;
+      row.classList.toggle('hidden-row', !catMatch);
+    });
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var filter = btn.getAttribute('data-filter');
-      filterBtns.forEach(function(b) { b.classList.remove('active'); });
+      var filterType = btn.getAttribute('data-filter-type');
+      activeFilters[filterType] = filter;
+
+      // Toggle active state within same filter-bar
+      var bar = btn.parentElement;
+      bar.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
 
-      tbody.querySelectorAll('tr').forEach(function(row) {
-        row.classList.toggle('hidden-row', filter !== 'all' && row.getAttribute('data-category') !== filter);
-      });
-      avgRows.forEach(function(row) {
-        row.classList.toggle('hidden-row', filter !== 'all' && row.getAttribute('data-category') !== filter);
-      });
+      applyFilters();
     });
   });
 })();`
@@ -499,35 +512,75 @@ function buildComparisonCards(
   const hasLongTerm = results.some((r) => r.category === 'Long-Term')
   const hasBothCategories = hasShortTerm && hasLongTerm
 
+  const cards: string[] = []
+
   if (hasBothCategories) {
     const bestLT = sorted.find((r) => r.category === 'Long-Term')
     const bestST = sorted.find((r) => r.category === 'Short-Term')
-    return `<div class="comparison-row">
+    cards.push(`<div class="comparison-row">
         ${buildBestCard('Best Long-Term', bestLT, '#40c057', '#2d6a4f')}
         ${buildBestCard('Best Short-Term', bestST, '#339af0', '#1864ab')}
-      </div>`
+      </div>`)
+  } else {
+    cards.push(
+      buildBestCard(
+        hasShortTerm ? 'Best Short-Term' : 'Best Long-Term',
+        sorted[0],
+        hasShortTerm ? '#339af0' : '#40c057',
+        hasShortTerm ? '#1864ab' : '#2d6a4f',
+      ),
+    )
   }
 
-  return buildBestCard(
-    hasShortTerm ? 'Best Short-Term' : 'Best Long-Term',
-    sorted[0],
-    hasShortTerm ? '#339af0' : '#40c057',
-    hasShortTerm ? '#1864ab' : '#2d6a4f',
-  )
+  // Per-pair best cards when multiple pairs
+  const uniquePairs = [...new Set(results.map((r) => r.pair))].sort()
+  if (uniquePairs.length > 1) {
+    const pairCards = uniquePairs
+      .map((pair) => {
+        const best = sorted.find((r) => r.pair === pair)
+        return buildBestCard(`Best ${pair}`, best, '#e8a838', '#5c4813')
+      })
+      .join('')
+    cards.push(`<div class="comparison-row">${pairCards}</div>`)
+  }
+
+  return cards.join('')
 }
 
 function buildFilterButtons(results: SimulationResult[]): string {
   const hasShortTerm = results.some((r) => r.category === 'Short-Term')
   const hasLongTerm = results.some((r) => r.category === 'Long-Term')
-  if (!hasShortTerm || !hasLongTerm) return ''
+  const uniquePairs = [...new Set(results.map((r) => r.pair))].sort()
+  const hasMultiplePairs = uniquePairs.length > 1
 
-  const longCount = results.filter((r) => r.category === 'Long-Term').length
-  const shortCount = results.filter((r) => r.category === 'Short-Term').length
-  return `<div class="filter-bar">
-        <button class="filter-btn active" data-filter="all">All (${results.length})</button>
-        <button class="filter-btn" data-filter="Long-Term">Long-Term (${longCount})</button>
-        <button class="filter-btn" data-filter="Short-Term">Short-Term (${shortCount})</button>
+  if (!hasShortTerm && !hasLongTerm && !hasMultiplePairs) return ''
+
+  let html = ''
+
+  if (hasShortTerm && hasLongTerm) {
+    const longCount = results.filter((r) => r.category === 'Long-Term').length
+    const shortCount = results.filter((r) => r.category === 'Short-Term').length
+    html += `<div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" data-filter-type="category">All (${results.length})</button>
+        <button class="filter-btn" data-filter="Long-Term" data-filter-type="category">Long-Term (${longCount})</button>
+        <button class="filter-btn" data-filter="Short-Term" data-filter-type="category">Short-Term (${shortCount})</button>
       </div>`
+  }
+
+  if (hasMultiplePairs) {
+    const pairButtons = uniquePairs
+      .map((p) => {
+        const count = results.filter((r) => r.pair === p).length
+        return `<button class="filter-btn" data-filter="${p}" data-filter-type="pair">${p} (${count})</button>`
+      })
+      .join('\n        ')
+    html += `<div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" data-filter-type="pair">All Pairs (${results.length})</button>
+        ${pairButtons}
+      </div>`
+  }
+
+  return html
 }
 
 function buildAveragesTable(results: SimulationResult[]): string {
@@ -568,9 +621,10 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
       const profit = r.data.profit ?? 0
       const beatsHodl = profit > 0
       const resultKey = `${r.pair}_${r.interval}_${r.strategy}_${r.startDate}_${r.endDate}`
-      return `<tr class="${beatsHodl ? 'beats-hodl' : 'loses-hodl'}" data-category="${r.category}">
+      return `<tr class="${beatsHodl ? 'beats-hodl' : 'loses-hodl'}" data-category="${r.category}" data-pair="${r.pair}">
           <td>${i + 1}</td>
           <td>${r.strategy.toUpperCase()}</td>
+          <td>${r.pair}</td>
           <td><span class="category-badge ${r.category === 'Short-Term' ? 'cat-short' : 'cat-long'}">${r.category}</span></td>
           <td>${r.interval}</td>
           <td>${r.startDate} \u2192 ${r.endDate}</td>
@@ -592,17 +646,18 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
         <tr>
           <th data-col="0" data-type="number">Rank <span class="sort-arrow"></span></th>
           <th data-col="1" data-type="string">Strategy <span class="sort-arrow"></span></th>
-          <th data-col="2" data-type="string">Category <span class="sort-arrow"></span></th>
-          <th data-col="3" data-type="string">Period <span class="sort-arrow"></span></th>
-          <th data-col="4" data-type="string">Dates <span class="sort-arrow"></span></th>
-          <th data-col="5" data-type="money">Initial Capital <span class="sort-arrow"></span></th>
-          <th data-col="6" data-type="money">Final Capital <span class="sort-arrow"></span></th>
-          <th data-col="7" data-type="percent">Profit vs HODL <span class="sort-arrow"></span></th>
-          <th data-col="8" data-type="percent">Win Rate <span class="sort-arrow"></span></th>
-          <th data-col="9" data-type="number">Profit Factor <span class="sort-arrow"></span></th>
-          <th data-col="10" data-type="percent">Max Drawdown <span class="sort-arrow"></span></th>
-          <th data-col="11" data-type="number">Sharpe <span class="sort-arrow"></span></th>
-          <th data-col="12" data-type="number">Trades <span class="sort-arrow"></span></th>
+          <th data-col="2" data-type="string">Pair <span class="sort-arrow"></span></th>
+          <th data-col="3" data-type="string">Category <span class="sort-arrow"></span></th>
+          <th data-col="4" data-type="string">Period <span class="sort-arrow"></span></th>
+          <th data-col="5" data-type="string">Dates <span class="sort-arrow"></span></th>
+          <th data-col="6" data-type="money">Initial Capital <span class="sort-arrow"></span></th>
+          <th data-col="7" data-type="money">Final Capital <span class="sort-arrow"></span></th>
+          <th data-col="8" data-type="percent">Profit vs HODL <span class="sort-arrow"></span></th>
+          <th data-col="9" data-type="percent">Win Rate <span class="sort-arrow"></span></th>
+          <th data-col="10" data-type="number">Profit Factor <span class="sort-arrow"></span></th>
+          <th data-col="11" data-type="percent">Max Drawdown <span class="sort-arrow"></span></th>
+          <th data-col="12" data-type="number">Sharpe <span class="sort-arrow"></span></th>
+          <th data-col="13" data-type="number">Trades <span class="sort-arrow"></span></th>
           <th>Chart</th>
         </tr>
       </thead>
@@ -617,7 +672,8 @@ export function generateHtml(
   const sorted = [...results].sort(
     (a, b) => (b.data.lastPositionMoney ?? 0) - (a.data.lastPositionMoney ?? 0),
   )
-  const pair = sorted[0]?.pair ?? 'N/A'
+  const uniquePairs = [...new Set(results.map((r) => r.pair))].sort()
+  const pairsLabel = uniquePairs.join(', ')
   const now = new Date().toLocaleString()
 
   // Build chart data maps
@@ -663,14 +719,14 @@ export function generateHtml(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Backtest Report \u2014 ${pair}</title>
+  <title>Backtest Report \u2014 ${pairsLabel}</title>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>${buildStyles()}</style>
 </head>
 <body>
   <div class="header">
     <h1>Backtest Report</h1>
-    <div class="header-meta">Pair: ${pair} &middot; Generated: ${now} &middot; ${results.length} simulations</div>
+    <div class="header-meta">Pairs: ${pairsLabel} &middot; Generated: ${now} &middot; ${results.length} simulations</div>
   </div>
 
   ${buildComparisonCards(results, sorted)}

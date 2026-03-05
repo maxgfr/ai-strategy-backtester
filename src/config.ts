@@ -11,10 +11,37 @@ export type DateRange = {
 
 export type SimulationProfile = {
   readonly name: string
-  readonly maxArraySize: number
   readonly periods: BinanceInterval[]
   readonly strategies: string[]
   readonly dates: DateRange[]
+}
+
+/**
+ * Sliding window size per interval.
+ *
+ * Indicators need enough candles for warmup (longest common: EMA/Donchian 200).
+ * We use ~3× the max indicator period so SMA-seeded indicators converge properly.
+ * Shorter intervals produce more candles per unit of time, so they need a bigger window.
+ */
+const MAX_ARRAY_SIZE: Record<string, number> = {
+  '1m': 15000,
+  '3m': 12000,
+  '5m': 10000,
+  '15m': 8000,
+  '30m': 7000,
+  '1h': 6000,
+  '2h': 5000,
+  '4h': 4000,
+  '6h': 3000,
+  '8h': 2500,
+  '12h': 2000,
+  '1d': 1500,
+  '3d': 1200,
+  '1w': 1000,
+}
+
+export function maxArraySizeForInterval(interval: BinanceInterval): number {
+  return MAX_ARRAY_SIZE[interval] ?? 1000
 }
 
 export type GenerationConfig = {
@@ -28,9 +55,7 @@ export type GenerationConfig = {
 
 export type AppConfig = {
   readonly trading: {
-    readonly from: string
-    readonly to: string
-    readonly pair: string
+    readonly pairs: string[]
     readonly fees: number
     readonly initialCapital: number
   }
@@ -50,14 +75,19 @@ type RawDateRange = { start: string; end: string }
 type RawSimulation = { profiles: Record<string, RawProfile> } | RawProfile
 
 type RawProfile = {
-  maxArraySize: number
   periods: BinanceInterval[]
   strategies: string[]
   dates: RawDateRange[]
 }
 
 type RawConfig = {
-  trading: { from: string; to: string; fees: number; initialCapital: number }
+  trading: {
+    from?: string
+    to?: string
+    pairs?: string[]
+    fees: number
+    initialCapital: number
+  }
   simulation: RawSimulation
   generation?: {
     enabled: boolean
@@ -93,7 +123,6 @@ function parseProfiles(raw: RawConfig['simulation']): SimulationProfile[] {
   if ('profiles' in raw) {
     return Object.entries(raw.profiles).map(([name, profile]) => ({
       name,
-      maxArraySize: profile.maxArraySize,
       periods: profile.periods,
       strategies: profile.strategies,
       dates: parseDates(profile.dates),
@@ -104,7 +133,6 @@ function parseProfiles(raw: RawConfig['simulation']): SimulationProfile[] {
   return [
     {
       name: 'default',
-      maxArraySize: raw.maxArraySize,
       periods: raw.periods,
       strategies: raw.strategies,
       dates: parseDates(raw.dates),
@@ -133,10 +161,20 @@ export function loadConfig(path?: string): AppConfig {
     temperature: 0.3,
   }
 
+  const pairs = raw.trading.pairs ?? [
+    `${raw.trading.from ?? ''}${raw.trading.to ?? ''}`,
+  ]
+  if (pairs.length === 0 || pairs.some((p) => p.length === 0)) {
+    throw new Error(
+      'Invalid config: trading must have either "pairs" array or "from"/"to" fields',
+    )
+  }
+
   return {
     trading: {
-      ...raw.trading,
-      pair: raw.trading.from + raw.trading.to,
+      pairs,
+      fees: raw.trading.fees,
+      initialCapital: raw.trading.initialCapital,
     },
     simulation: {
       profiles: parseProfiles(raw.simulation),
@@ -150,14 +188,14 @@ export function loadConfig(path?: string): AppConfig {
 }
 
 export function buildDbModel(
-  config: AppConfig,
+  pair: string,
   interval: BinanceInterval,
 ): DbSchema {
   return {
     version: 1,
     initialParameters: {
       period: interval,
-      pair: config.trading.pair,
+      pair,
     },
     historicPosition: [],
     position: { date: '', type: 'sell', price: 0, capital: 0, assets: 0 },

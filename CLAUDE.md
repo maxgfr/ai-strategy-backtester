@@ -119,7 +119,8 @@ All configuration is externalized in `config.json` at the project root. Loaded b
 
 | Field | Default | Description |
 |---|---|---|
-| `trading.from` / `trading.to` | `ETH` / `USDT` | Trading pair (combined as `ETHUSDT`) |
+| `trading.pairs` | `["ETHUSDT", "BTCUSDT"]` | Trading pairs array — simulation runs matrix across all pairs |
+| `trading.from` / `trading.to` | *(optional)* | Legacy single-pair format (combined as `ETHUSDT`), used if `pairs` absent |
 | `trading.fees` | `0.0026` | Trading fees (0.26%) |
 | `trading.initialCapital` | `10000` | Starting capital |
 
@@ -226,8 +227,9 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 - **Single backtest**: `pnpm backtest PAIR INTERVAL START END STRATEGY` — runs in main process
 - **Full matrix**: `pnpm backtest` (no args) — iterates over all simulation profiles, resolves strategy patterns per profile, pre-downloads data, then dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
 - Each worker receives `maxArraySize` from its profile (3000 for short-term, 1000 for long-term)
-- Results saved as `db/{pair}_{interval}_{strategy}_{start}_{end}.json`
-- Report generated as `reports/report.html` with:
+- Each run creates `db/{runId}/` with results as `{pair}_{interval}_{strategy}_{start}_{end}.json`
+- `runId` is an auto-generated timestamp (`YYYYMMDD_HHmmss`) — concurrent runs never collide
+- Report generated as `reports/report_<timestamp>.html` (unique per run, no overwrite) with:
   - **Category comparison cards** (best long-term vs best short-term side by side)
   - **Filter buttons** (All / Long-Term / Short-Term) to toggle rankings and averages tables
   - **Category badges** on each row showing Short-Term (blue) or Long-Term (green)
@@ -247,7 +249,7 @@ type CandleStick = { open, high, close, low, volume, time }
 type LastPosition = { date, type, price, capital, assets, tradeProfit? }
 type DbSchema = { version, initialParameters, historicPosition, position, ...metrics }
 type SimulationProfile = { name, maxArraySize, periods, strategies, dates }  // in config.ts
-type AppConfig = { trading, simulation: { profiles: SimulationProfile[] }, generation, paths }
+type AppConfig = { trading: { pairs, fees, initialCapital }, simulation: { profiles: SimulationProfile[] }, generation, paths }
 ```
 
 ---
@@ -289,7 +291,7 @@ When creating or reviewing strategies, apply these proven insights:
 
 ## Important Notes for AI Assistance
 
-- **No HTTP server** — Entry point is a plain script. State persisted locally in `./db/*.json`
+- **No HTTP server** — Entry point is a plain script. State persisted locally in `./db/{runId}/*.json`
 - **All simulation data** is written to `./data/` and DB state to `./db/` — both ignored by git
 - **Reports** are written to `./reports/` — also ignored by git
 - **Immutability**: always create new objects, never mutate

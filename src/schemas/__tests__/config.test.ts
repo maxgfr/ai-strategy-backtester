@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { RawConfigSchema } from '../config'
 
 const validConfig = {
-  trading: { from: 'ETH', to: 'USDT', fees: 0.0026, initialCapital: 10000 },
+  trading: {
+    pairs: ['ETHUSDT', 'BTCUSDT'],
+    fees: 0.0026,
+    initialCapital: 10000,
+  },
   simulation: {
     profiles: {
       longTerm: {
-        maxArraySize: 1000,
         periods: ['4h', '6h'],
         strategies: ['*'],
         dates: [{ start: '2022-01-01', end: '2026-02-01' }],
@@ -25,7 +28,6 @@ describe('RawConfigSchema', () => {
     const flat = {
       ...validConfig,
       simulation: {
-        maxArraySize: 1000,
         periods: ['4h'],
         strategies: ['*'],
         dates: [{ start: '2022-01-01', end: '2023-01-01' }],
@@ -48,10 +50,18 @@ describe('RawConfigSchema', () => {
     expect(RawConfigSchema.safeParse(withGen).success).toBe(true)
   })
 
-  it('rejects missing trading.from', () => {
+  it('accepts legacy from/to format', () => {
+    const legacy = {
+      ...validConfig,
+      trading: { from: 'ETH', to: 'USDT', fees: 0.0026, initialCapital: 10000 },
+    }
+    expect(RawConfigSchema.safeParse(legacy).success).toBe(true)
+  })
+
+  it('rejects empty pairs array', () => {
     const bad = {
       ...validConfig,
-      trading: { to: 'USDT', fees: 0.0026, initialCapital: 10000 },
+      trading: { pairs: [], fees: 0.0026, initialCapital: 10000 },
     }
     const result = RawConfigSchema.safeParse(bad)
     expect(result.success).toBe(false)
@@ -63,7 +73,6 @@ describe('RawConfigSchema', () => {
       simulation: {
         profiles: {
           test: {
-            maxArraySize: 1000,
             periods: ['99z'],
             strategies: ['*'],
             dates: [{ start: '2022-01-01', end: '2023-01-01' }],
@@ -78,7 +87,7 @@ describe('RawConfigSchema', () => {
   it('rejects fees > 1', () => {
     const bad = {
       ...validConfig,
-      trading: { from: 'ETH', to: 'USDT', fees: 1.5, initialCapital: 10000 },
+      trading: { pairs: ['ETHUSDT'], fees: 1.5, initialCapital: 10000 },
     }
     const result = RawConfigSchema.safeParse(bad)
     expect(result.success).toBe(false)
@@ -87,7 +96,7 @@ describe('RawConfigSchema', () => {
   it('rejects negative initialCapital', () => {
     const bad = {
       ...validConfig,
-      trading: { from: 'ETH', to: 'USDT', fees: 0.001, initialCapital: -100 },
+      trading: { pairs: ['ETHUSDT'], fees: 0.001, initialCapital: -100 },
     }
     const result = RawConfigSchema.safeParse(bad)
     expect(result.success).toBe(false)
@@ -99,7 +108,6 @@ describe('RawConfigSchema', () => {
       simulation: {
         profiles: {
           test: {
-            maxArraySize: 1000,
             periods: [],
             strategies: ['*'],
             dates: [{ start: '2022-01-01', end: '2023-01-01' }],

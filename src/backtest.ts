@@ -45,11 +45,11 @@ const params =
     : undefined
 
 const totalStart = Date.now()
-await runSimulation(params, configPath, profileFilter)
+const runId = await runSimulation(params, configPath, profileFilter)
 
 logger.info('Generating report...')
 const reportStart = Date.now()
-const reportPath = generateReport()
+const reportPath = generateReport(runId)
 const reportElapsed = ((Date.now() - reportStart) / 1000).toFixed(1)
 if (reportPath) {
   logger.info(`Report generated in ${reportElapsed}s`)

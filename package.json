@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "pnpm clean:db && pnpm clean:data",
-    "clean:db": "find ./db -type f ! -name '.gitignore' ! -name '.gitkeep' -delete",
+    "clean:db": "find ./db -mindepth 1 ! -name '.gitignore' ! -name '.gitkeep' -exec rm -rf {} +",
     "clean:data": "find ./data -type f ! -name '.gitignore' ! -name '.gitkeep' -delete",
     "lint": "biome check .",
     "format": "biome format --write .",

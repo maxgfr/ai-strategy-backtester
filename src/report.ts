@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { resolve } from 'node:path'
@@ -120,11 +121,38 @@ function loadCandleData(
   return candleData
 }
 
-export function generateReport(): string | null {
-  const dbFolder = resolve(process.cwd(), 'db')
+function buildReportFilename(): string {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  return `report_${date}_${time}.html`
+}
+
+function findLatestRunFolder(dbRoot: string): string | null {
+  if (!existsSync(dbRoot)) return null
+  const entries = readdirSync(dbRoot)
+    .filter((e) => statSync(resolve(dbRoot, e)).isDirectory())
+    .sort()
+  return entries.length > 0 ? entries[entries.length - 1] : null
+}
+
+export function generateReport(runId?: string): string | null {
+  const dbRoot = resolve(process.cwd(), 'db')
+  const resolvedRunId = runId ?? findLatestRunFolder(dbRoot)
+  if (!resolvedRunId) {
+    logger.error('No simulation runs found in db/. Run pnpm backtest first.')
+    return null
+  }
+  const dbFolder = resolve(dbRoot, resolvedRunId)
+  if (!existsSync(dbFolder)) {
+    logger.error(`Run folder not found: ${dbFolder}`)
+    return null
+  }
   const dataFolder = resolve(process.cwd(), 'data')
   const outputDir = resolve(process.cwd(), 'reports')
-  const outputPath = resolve(outputDir, 'report.html')
+  const outputPath = resolve(outputDir, buildReportFilename())
+  logger.info(`Using run: ${resolvedRunId}`)
 
   logger.info('Loading simulation results...')
   const results = loadResults(dbFolder)

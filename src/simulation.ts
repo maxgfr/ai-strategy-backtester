@@ -1,13 +1,15 @@
 import { fork } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
 import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import {
   type AppConfig,
   buildDbModel,
   loadConfig,
+  maxArraySizeForInterval,
   type SimulationProfile,
 } from './config'
-import { cleanFilesOfFolder, readAndLoadData } from './data'
+import { readAndLoadData } from './data'
 import { Database, type IDatabase } from './database'
 import { logger } from './logger'
 import { getStrategy, listStrategiesByPattern } from './strategies/registry'
@@ -32,7 +34,6 @@ type WorkerData = {
   endDateIso: string
   strategyName: string
   dbPath: string
-  maxArraySize: number
 }
 
 function computeTradeStats(db: IDatabase): void {
@@ -110,7 +111,7 @@ async function simulation(
   config: AppConfig,
   maxArraySize: number,
 ): Promise<void> {
-  const db = new Database(dbPath, buildDbModel(config, interval))
+  const db = new Database(dbPath, buildDbModel(pair, interval))
   const historic: Array<CandleStick> = await readAndLoadData(
     interval,
     pair,
@@ -185,11 +186,8 @@ export async function runSingleSimulation(
   dbPath: string,
   strategyName: string,
   config: AppConfig,
-  maxArraySize?: number,
 ): Promise<void> {
   const strategy = getStrategy(strategyName)
-  const arraySize =
-    maxArraySize ?? config.simulation.profiles[0]?.maxArraySize ?? 1000
   await simulation(
     interval,
     pair,
@@ -198,7 +196,7 @@ export async function runSingleSimulation(
     dbPath,
     strategy,
     config,
-    arraySize,
+    maxArraySizeForInterval(interval),
   )
 }
 
@@ -268,15 +266,23 @@ function resolveStrategiesForProfile(profile: SimulationProfile): string[] {
   return listStrategiesByPattern(profile.strategies)
 }
 
+function generateRunId(): string {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+}
+
 export async function runSimulation(
   params?: SimulationParams,
   configPath?: string,
   profileFilter?: string,
-): Promise<void> {
+): Promise<string> {
   const config = loadConfig(configPath)
   const simulationStart = Date.now()
-  logger.info('Starting simulation')
-  cleanFilesOfFolder([config.paths.dbFolder], ['.gitkeep', '.gitignore'])
+  const runId = generateRunId()
+  const runFolder = `${config.paths.dbFolder}/${runId}`
+  mkdirSync(runFolder, { recursive: true })
+  logger.info(`Starting simulation (run: ${runId})`)
 
   if (params) {
     const firstProfile = config.simulation.profiles[0]
@@ -291,17 +297,16 @@ export async function runSimulation(
       params.pair,
       params.startDate,
       params.endDate,
-      `${config.paths.dbFolder}/${params.pair}_${params.interval}_${strategyName}_${formatDate(params.startDate)}_${formatDate(params.endDate)}.json`,
+      `${runFolder}/${params.pair}_${params.interval}_${strategyName}_${formatDate(params.startDate)}_${formatDate(params.endDate)}.json`,
       strategyName,
       config,
-      firstProfile?.maxArraySize,
     )
     const singleElapsed = ((Date.now() - singleStart) / 1000).toFixed(1)
     logger.info(
       `Backtest ${strategyName} (${params.pair} ${params.interval}) completed in ${singleElapsed}s`,
     )
   } else {
-    const pair = config.trading.pair
+    const pairs = config.trading.pairs
     const allCombinations: WorkerData[] = []
 
     const uniqueData = new Map<
@@ -325,6 +330,8 @@ export async function runSimulation(
       logger.info(`Filtering to profile: ${profileFilter}`)
     }
 
+    logger.info(`Trading pairs: ${pairs.join(', ')}`)
+
     for (const profile of profiles) {
       const strategies = resolveStrategiesForProfile(profile)
 
@@ -336,22 +343,24 @@ export async function runSimulation(
       }
 
       logger.info(
-        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods (${profile.periods.join(', ')}) x ${profile.dates.length} date ranges`,
+        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods (${profile.periods.join(', ')}) x ${pairs.length} pairs x ${profile.dates.length} date ranges`,
       )
       logger.info(`  Strategies: ${strategies.join(', ')}`)
 
-      const combinations = strategies.flatMap((strategyName) =>
-        profile.periods.flatMap((period) =>
-          profile.dates.map((dates) => ({
-            strategyName,
-            period,
-            dates,
-            maxArraySize: profile.maxArraySize,
-          })),
+      const combinations = pairs.flatMap((pair) =>
+        strategies.flatMap((strategyName) =>
+          profile.periods.flatMap((period) =>
+            profile.dates.map((dates) => ({
+              pair,
+              strategyName,
+              period,
+              dates,
+            })),
+          ),
         ),
       )
 
-      for (const { period, dates } of combinations) {
+      for (const { pair, period, dates } of combinations) {
         const key = `${pair}_${period}_${formatDate(dates.start)}_${formatDate(dates.end)}`
         if (!uniqueData.has(key)) {
           uniqueData.set(key, {
@@ -363,12 +372,7 @@ export async function runSimulation(
         }
       }
 
-      for (const {
-        strategyName,
-        period,
-        dates,
-        maxArraySize,
-      } of combinations) {
+      for (const { pair, strategyName, period, dates } of combinations) {
         allCombinations.push({
           configPath,
           interval: period,
@@ -376,8 +380,7 @@ export async function runSimulation(
           startDateIso: dates.start.toISOString(),
           endDateIso: dates.end.toISOString(),
           strategyName,
-          dbPath: `${config.paths.dbFolder}/${pair}_${period}_${strategyName}_${formatDate(dates.start)}_${formatDate(dates.end)}.json`,
-          maxArraySize,
+          dbPath: `${runFolder}/${pair}_${period}_${strategyName}_${formatDate(dates.start)}_${formatDate(dates.end)}.json`,
         })
       }
     }
@@ -407,5 +410,6 @@ export async function runSimulation(
   }
 
   const totalElapsed = ((Date.now() - simulationStart) / 1000).toFixed(1)
-  logger.info(`Simulation finished in ${totalElapsed}s`)
+  logger.info(`Simulation finished in ${totalElapsed}s (run: ${runId})`)
+  return runId
 }
