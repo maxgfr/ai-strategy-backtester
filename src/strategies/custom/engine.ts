@@ -7,9 +7,7 @@ import type {
   Condition,
   CustomStrategyDef,
   IndicatorParams,
-  ScoreSignalBlock,
   SignalBlock,
-  SimpleSignalBlock,
   ValueRef,
 } from './types'
 
@@ -112,29 +110,27 @@ function evaluateSignalBlock(
   aliasMap: AliasMap,
 ): boolean {
   if (block.mode === 'score') {
-    const scoreBlock = block as ScoreSignalBlock
-    if (scoreBlock.required) {
-      const allRequired = scoreBlock.required.every((c) =>
+    if (block.required) {
+      const allRequired = block.required.every((c) =>
         evaluateCondition(c, candle, cache, aliasMap),
       )
       if (!allRequired) return false
     }
     let score = 0
-    for (const c of scoreBlock.scored) {
+    for (const c of block.scored) {
       if (evaluateCondition(c, candle, cache, aliasMap)) score++
     }
-    return score >= scoreBlock.threshold
+    return score >= block.threshold
   }
 
-  const simpleBlock = block as SimpleSignalBlock
   if (block.mode === 'all') {
-    return simpleBlock.conditions.every((c) =>
+    return block.conditions.every((c) =>
       evaluateCondition(c, candle, cache, aliasMap),
     )
   }
 
   // mode === 'any'
-  return simpleBlock.conditions.some((c) =>
+  return block.conditions.some((c) =>
     evaluateCondition(c, candle, cache, aliasMap),
   )
 }
@@ -196,18 +192,16 @@ export function createCustomStrategy(def: CustomStrategyDef): StrategyFn {
 function collectValueRefs(block: SignalBlock): ValueRef[] {
   const refs: ValueRef[] = []
   if (block.mode === 'score') {
-    const sb = block as ScoreSignalBlock
-    if (sb.required) {
-      for (const [l, , r] of sb.required) {
+    if (block.required) {
+      for (const [l, , r] of block.required) {
         refs.push(l, r)
       }
     }
-    for (const [l, , r] of sb.scored) {
+    for (const [l, , r] of block.scored) {
       refs.push(l, r)
     }
   } else {
-    const sb = block as SimpleSignalBlock
-    for (const [l, , r] of sb.conditions) {
+    for (const [l, , r] of block.conditions) {
       refs.push(l, r)
     }
   }

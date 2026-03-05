@@ -1,6 +1,7 @@
 import { loadConfig } from './config'
 import { runSingleSimulation } from './simulation'
 import type { BinanceInterval } from './types'
+import { getErrorMessage } from './utils'
 
 type WorkerData = {
   configPath?: string
@@ -31,7 +32,7 @@ process.on('message', (data: WorkerData) => {
     .catch((err) => {
       process.send?.({
         type: 'error',
-        message: err instanceof Error ? err.message : String(err),
+        message: getErrorMessage(err),
       })
       process.disconnect()
     })

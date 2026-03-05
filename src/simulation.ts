@@ -16,7 +16,7 @@ import { getStrategy, listStrategiesByPattern } from './strategies/registry'
 import type { StrategyFn } from './strategies/types'
 import { executeBuy, executeSell } from './trade'
 import type { BinanceInterval, CandleStick } from './types'
-import { formatDate, round } from './utils'
+import { formatDate, formatTimestamp, round } from './utils'
 
 export type SimulationParams = {
   pair: string
@@ -267,9 +267,7 @@ function resolveStrategiesForProfile(profile: SimulationProfile): string[] {
 }
 
 function generateRunId(): string {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  return formatTimestamp(new Date())
 }
 
 export async function runSimulation(

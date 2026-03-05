@@ -13,6 +13,7 @@ import { logger } from './logger'
 import type { SimulationResult } from './report-html'
 import { generateHtml } from './report-html'
 import type { CandleStick, DbSchema } from './types'
+import { formatDate, pad2 } from './utils'
 
 type ParsedFilename = {
   pair: string
@@ -123,9 +124,8 @@ function loadCandleData(
 
 function buildReportFilename(): string {
   const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const date = formatDate(now)
+  const time = `${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`
   return `report_${date}_${time}.html`
 }
 

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { logger } from '../../logger'
+import { getErrorMessage } from '../../utils'
 import { validateStrategy } from './engine'
 import type { CustomStrategyDef } from './types'
 
@@ -31,7 +32,7 @@ export function discoverCustomStrategies(
       }
     } catch (err) {
       logger.warn(
-        `Failed to load custom strategy "${file}": ${err instanceof Error ? err.message : err}`,
+        `Failed to load custom strategy "${file}": ${getErrorMessage(err)}`,
       )
     }
   }
