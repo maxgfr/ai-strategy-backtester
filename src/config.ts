@@ -17,31 +17,14 @@ export type SimulationProfile = {
 }
 
 /**
- * Sliding window size per interval.
- *
- * Indicators need enough candles for warmup (longest common: EMA/Donchian 200).
- * We use ~3× the max indicator period so SMA-seeded indicators converge properly.
- * Shorter intervals produce more candles per unit of time, so they need a bigger window.
+ * Sliding window of candles passed to strategies each tick.
+ * Indicators converge after ~3-5× their longest period (typically 200).
+ * 1000 candles = 5× EMA(200), sufficient for all intervals.
  */
-const MAX_ARRAY_SIZE: Record<string, number> = {
-  '1m': 15000,
-  '3m': 12000,
-  '5m': 10000,
-  '15m': 8000,
-  '30m': 7000,
-  '1h': 6000,
-  '2h': 5000,
-  '4h': 4000,
-  '6h': 3000,
-  '8h': 2500,
-  '12h': 2000,
-  '1d': 1500,
-  '3d': 1200,
-  '1w': 1000,
-}
+const MAX_ARRAY_SIZE = 1000
 
-export function maxArraySizeForInterval(interval: BinanceInterval): number {
-  return MAX_ARRAY_SIZE[interval] ?? 1000
+export function maxArraySizeForInterval(_interval: BinanceInterval): number {
+  return MAX_ARRAY_SIZE
 }
 
 export type GenerationConfig = {
