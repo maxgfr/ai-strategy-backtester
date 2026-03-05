@@ -12,7 +12,7 @@ export function WWMA({
   candles: Candle[]
   period: number
 }) {
-  let result: WWMAResultItem[] = []
+  const result: WWMAResultItem[] = []
   const alpha = 1 / period
 
   function calculate(candle: Candle): WWMAResultItem {
@@ -32,7 +32,7 @@ export function WWMA({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       result.push(item)

@@ -12,7 +12,7 @@ export function Sum({
   candles: Candle[]
   period: number
 }) {
-  let result: SumResultItem[] = []
+  const result: SumResultItem[] = []
   const window: number[] = []
   let rollingSum = 0
   let prevWindow: number[] = []
@@ -42,7 +42,7 @@ export function Sum({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         window.length = 0
         for (const v of prevWindow) window.push(v)
         rollingSum = prevSum

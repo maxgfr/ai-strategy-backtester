@@ -6,12 +6,13 @@ export const round = (v: string | number, precision = 2): number => {
 }
 
 export const formatDate = (date: Date, withHour = false): string => {
+  const pad = (n: number) => String(n).padStart(2, '0')
   const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  const hour = date.getHours()
-  const minute = date.getMinutes()
-  const second = date.getSeconds()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+  const hour = pad(date.getHours())
+  const minute = pad(date.getMinutes())
+  const second = pad(date.getSeconds())
   return withHour
     ? `${year}-${month}-${day} ${hour}:${minute}:${second}`
     : `${year}-${month}-${day}`

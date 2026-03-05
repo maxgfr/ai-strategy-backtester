@@ -14,7 +14,7 @@ export function Aroon({
   candles: Candle[]
   period?: number
 }) {
-  let result: AroonResultItem[] = []
+  const result: AroonResultItem[] = []
   const highWindow: number[] = []
   const lowWindow: number[] = []
   let prevHighWindow: number[] = []
@@ -63,7 +63,7 @@ export function Aroon({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         highWindow.length = 0
         lowWindow.length = 0
         for (const v of prevHighWindow) highWindow.push(v)

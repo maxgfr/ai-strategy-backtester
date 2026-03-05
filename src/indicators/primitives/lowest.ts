@@ -12,7 +12,7 @@ export function lowest({
   candles: Candle[]
   period: number
 }) {
-  let result: LowestResultItem[] = []
+  const result: LowestResultItem[] = []
   let candlesStack = [...candles]
   let low: number | null = null
   let prevLow: number | null = null
@@ -42,7 +42,7 @@ export function lowest({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         candlesStack = candlesStack.slice(0, -1)
         low = prevLow
       }

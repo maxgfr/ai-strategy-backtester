@@ -16,7 +16,7 @@ export function Chandelier({
   period?: number
   multiplier?: number
 }) {
-  let result: ChandelierResultItem[] = []
+  const result: ChandelierResultItem[] = []
   const atr = ATR({ candles: [], period })
   const highWindow: number[] = []
   const lowWindow: number[] = []
@@ -56,7 +56,7 @@ export function Chandelier({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         highWindow.length = 0
         lowWindow.length = 0
         for (const v of prevHighWindow) highWindow.push(v)

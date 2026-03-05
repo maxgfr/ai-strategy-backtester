@@ -14,7 +14,7 @@ export function PSAR({
   step?: number
   max?: number
 }) {
-  let result: PSARResultItem[] = []
+  const result: PSARResultItem[] = []
 
   let sar: number
   let extreme: number
@@ -114,7 +114,7 @@ export function PSAR({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         restoreSnapshot()
       }
       saveSnapshot()

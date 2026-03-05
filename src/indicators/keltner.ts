@@ -24,7 +24,7 @@ export function Keltner({
   multiplier?: number
   useSMA?: boolean
 }) {
-  let result: KeltnerResultItem[] = []
+  const result: KeltnerResultItem[] = []
   const ma = useSMA
     ? SMA({ candles: [], period: maPeriod })
     : EMA({ candles: [], period: maPeriod })
@@ -54,7 +54,7 @@ export function Keltner({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       if (item) result.push(item)

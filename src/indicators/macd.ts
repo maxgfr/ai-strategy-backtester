@@ -20,7 +20,7 @@ export function MACD({
   slowPeriod: number
   signalPeriod: number
 }) {
-  let result: MACDResultItem[] = []
+  const result: MACDResultItem[] = []
   const fastEma = EMA({ candles: [], period: fastPeriod })
   const slowEma = EMA({ candles: [], period: slowPeriod })
   const signalEma = EMA({ candles: [], period: signalPeriod })
@@ -50,7 +50,7 @@ export function MACD({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       if (item) result.push(item)

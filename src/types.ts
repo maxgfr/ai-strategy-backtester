@@ -10,7 +10,7 @@ export type CandleStick = {
 export type Position = 'buy' | 'sell'
 
 export type LastPosition = {
-  date: string | Date
+  date: string
   type: Position
   price: number
   capital: number

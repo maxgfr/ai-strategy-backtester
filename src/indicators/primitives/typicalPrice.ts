@@ -6,7 +6,7 @@ interface TypicalPriceResultItem {
 }
 
 export function TypicalPrice({ candles }: { candles: Candle[] }) {
-  let result: TypicalPriceResultItem[] = []
+  const result: TypicalPriceResultItem[] = []
 
   function calculate(candle: Candle): TypicalPriceResultItem {
     return {
@@ -25,7 +25,7 @@ export function TypicalPrice({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       result.push(item)

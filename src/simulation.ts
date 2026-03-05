@@ -79,8 +79,7 @@ function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
   const grossLoss = Math.abs(
     tradeProfits.filter((p) => p < 0).reduce((s, p) => s + p, 0),
   )
-  const profitFactor =
-    grossLoss === 0 ? Infinity : round(grossProfit / grossLoss)
+  const profitFactor = grossLoss === 0 ? 9999 : round(grossProfit / grossLoss)
 
   let maxDrawdown = 0
   let peak = initialCapital
@@ -156,11 +155,10 @@ async function simulation(
     }
 
     if (i === historic.length - 1) {
-      let finalPosition = db.get('position')
-      if (finalPosition.type === 'buy') {
+      if (db.get('position').type === 'buy') {
         executeSell(price, date, db, fees)
       }
-      finalPosition = db.get('position')
+      const finalPosition = db.get('position')
       const hodlAssets = db.get('hodlAssets') ?? 0
       const hodlMoney = hodlAssets * price
       db.set('hodlMoney', hodlMoney)
@@ -168,7 +166,9 @@ async function simulation(
       db.set('profit', finalPosition.capital - hodlMoney)
       db.set(
         'percentageProfit',
-        `${round(((finalPosition.capital - hodlMoney) / hodlMoney) * 100)}%`,
+        hodlMoney === 0
+          ? '0%'
+          : `${round(((finalPosition.capital - hodlMoney) / hodlMoney) * 100)}%`,
       )
       computeTradeStats(db)
       computeAdvancedMetrics(db, initialCapital)

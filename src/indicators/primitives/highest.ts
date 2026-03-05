@@ -12,7 +12,7 @@ export function highest({
   candles: Candle[]
   period: number
 }) {
-  let result: HighestResultItem[] = []
+  const result: HighestResultItem[] = []
   let candlesStack = [...candles]
   let high: number | null = null
   let prevHigh: number | null = null
@@ -42,7 +42,7 @@ export function highest({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         candlesStack = candlesStack.slice(0, -1)
         high = prevHigh
       }

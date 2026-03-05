@@ -7,7 +7,7 @@ interface VWAPResultItem {
 }
 
 export function VWAP({ candles }: { candles: Candle[] }) {
-  let result: VWAPResultItem[] = []
+  const result: VWAPResultItem[] = []
   let cumulativeTotal = 0
   let cumulativeVolume = 0
   let prevTotal = 0
@@ -38,7 +38,7 @@ export function VWAP({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         cumulativeTotal = prevTotal
         cumulativeVolume = prevVolume
       }

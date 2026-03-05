@@ -19,7 +19,7 @@ export function KDJ({
   kPeriod?: number
   dPeriod?: number
 }) {
-  let result: KDJResultItem[] = []
+  const result: KDJResultItem[] = []
   const highWindow: number[] = []
   const lowWindow: number[] = []
   const kSma = SMA({ candles: [], period: kPeriod })
@@ -64,7 +64,7 @@ export function KDJ({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         highWindow.length = 0
         lowWindow.length = 0
         for (const v of prevHighWindow) highWindow.push(v)

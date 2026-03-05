@@ -15,7 +15,7 @@ export function AO({
   fastPeriod?: number
   slowPeriod?: number
 }) {
-  let result: AOResultItem[] = []
+  const result: AOResultItem[] = []
   const fastSma = SMA({ candles: [], period: fastPeriod })
   const slowSma = SMA({ candles: [], period: slowPeriod })
 
@@ -38,7 +38,7 @@ export function AO({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       if (item) result.push(item)

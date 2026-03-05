@@ -15,7 +15,7 @@ export function CCI({
   candles: Candle[]
   period: number
 }) {
-  let result: CCIResultItem[] = []
+  const result: CCIResultItem[] = []
   const tpWindow: number[] = []
   const tpSma = SMA({ candles: [], period })
   let prevTpWindow: number[] = []
@@ -56,7 +56,7 @@ export function CCI({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         tpWindow.length = 0
         for (const v of prevTpWindow) tpWindow.push(v)
       }

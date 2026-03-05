@@ -14,7 +14,7 @@ export function TRIX({
   candles: Candle[]
   period: number
 }) {
-  let result: TRIXResultItem[] = []
+  const result: TRIXResultItem[] = []
   const ema1 = EMA({ candles: [], period })
   const ema2 = EMA({ candles: [], period })
   const ema3 = EMA({ candles: [], period })
@@ -53,7 +53,7 @@ export function TRIX({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         prevTriple = prevPrevTriple
       }
       const item = calculate(candle)

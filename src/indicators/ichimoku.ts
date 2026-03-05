@@ -20,7 +20,7 @@ function Ichimoku({
   basePeriod?: number
   spanPeriod?: number
 }) {
-  let result: IchimokuCoreResultItem[] = []
+  const result: IchimokuCoreResultItem[] = []
   const maxPeriod = Math.max(conversionPeriod, basePeriod, spanPeriod)
   const convHighs: number[] = []
   const convLows: number[] = []
@@ -78,7 +78,7 @@ function Ichimoku({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         convHighs.pop()
         convLows.pop()
         baseHighs.pop()

@@ -18,7 +18,7 @@ export function BollingerBands({
   period: number
   stdDev: number
 }) {
-  let result: BBResultItem[] = []
+  const result: BBResultItem[] = []
 
   const sma = SMA({ candles: [], period })
   const stdev = STDEV({ candles: [], period })
@@ -46,7 +46,7 @@ export function BollingerBands({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
 
       const item = calculate(candle)

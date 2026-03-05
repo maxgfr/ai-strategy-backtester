@@ -7,7 +7,7 @@ interface OBVResultItem {
 }
 
 export function OBV({ candles }: { candles: Candle[] }) {
-  let result: OBVResultItem[] = []
+  const result: OBVResultItem[] = []
   let obvValue = 0
   let prevClose: number | undefined
   let prevOBV = 0
@@ -36,7 +36,7 @@ export function OBV({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         obvValue = prevOBV
       }
       const item = calculate(candle)

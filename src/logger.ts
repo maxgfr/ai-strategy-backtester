@@ -1,7 +1,12 @@
 import * as winston from 'winston'
-import { loadConfig } from './config'
 
-const config = loadConfig()
+let logFile = 'all.log'
+try {
+  const { loadConfig } = await import('./config')
+  logFile = loadConfig().paths.logFile
+} catch {
+  // Config unavailable — use default log file path
+}
 
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'HH:mm:ss' }),
@@ -27,7 +32,7 @@ export const logger = winston.createLogger({
   transports: [
     new winston.transports.Console({ format: consoleFormat }),
     new winston.transports.File({
-      filename: config.paths.logFile,
+      filename: logFile,
       format: fileFormat,
     }),
   ],

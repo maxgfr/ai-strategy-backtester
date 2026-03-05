@@ -13,7 +13,7 @@ export function EMA({
   candles: Candle[]
   period: number
 }) {
-  let result: EMAResultItem[] = []
+  const result: EMAResultItem[] = []
   const sma = SMA({ candles: [], period })
   const exponent = 2 / (period + 1)
   let prevPrevEma: number | undefined
@@ -42,7 +42,7 @@ export function EMA({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         prevEma = prevPrevEma
       }
 

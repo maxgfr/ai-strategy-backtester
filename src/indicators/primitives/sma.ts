@@ -13,7 +13,7 @@ export function SMA({
   candles: Candle[]
   period: number
 }) {
-  let result: SMAResultItem[] = []
+  const result: SMAResultItem[] = []
   const list = [0]
   let counter = 1
   let sum = 0
@@ -49,7 +49,7 @@ export function SMA({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         list.pop()
 
         if (counter < period) {

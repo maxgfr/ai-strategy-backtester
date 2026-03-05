@@ -41,19 +41,3 @@ export const readAndLoadData = async (
   }
   return readJsonData(fileOutputName)
 }
-
-export function cleanFilesOfFolder(
-  folderToVerify: string[],
-  filesToExcept: string[],
-): void {
-  const folders = folderToVerify.map((v) => path.join(path.resolve(), v))
-  for (const folder of folders) {
-    const dir = fs.readdirSync(folder)
-    for (const file of dir) {
-      const fileDir = path.join(folder, file)
-      if (!filesToExcept.includes(file)) {
-        fs.unlinkSync(fileDir)
-      }
-    }
-  }
-}

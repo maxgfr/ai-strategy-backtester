@@ -13,7 +13,7 @@ export function RMA({
   candles: Candle[]
   period: number
 }) {
-  let result: RMAResultItem[] = []
+  const result: RMAResultItem[] = []
   let prevPrevSum: number | undefined
   let prevSum: number | undefined
   let sum: number | undefined = 0
@@ -44,7 +44,7 @@ export function RMA({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         prevSum = prevPrevSum
       }
 

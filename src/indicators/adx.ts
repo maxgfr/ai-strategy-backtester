@@ -16,7 +16,7 @@ export function ADX({
   candles: Candle[]
   period: number
 }) {
-  let result: ADXResultItem[] = []
+  const result: ADXResultItem[] = []
 
   const rmaPosDM = RMA({ candles: [], period })
   const rmaNegDM = RMA({ candles: [], period })
@@ -80,7 +80,7 @@ export function ADX({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       if (item) result.push(item)

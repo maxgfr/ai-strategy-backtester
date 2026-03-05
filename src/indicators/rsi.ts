@@ -15,7 +15,7 @@ export function RSI({
   candles: Candle[]
   period: number
 }) {
-  let result: RSIResultItem[] = []
+  const result: RSIResultItem[] = []
 
   const avgGain = averageGain({ candles: [], period })
   const avgLoss = averageLoss({ candles: [], period })
@@ -51,7 +51,7 @@ export function RSI({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
 
       const item = calculate(candle)

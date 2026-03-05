@@ -17,7 +17,7 @@ export function Stochastic({
   period: number
   signalPeriod: number
 }) {
-  let result: StochasticResultItem[] = []
+  const result: StochasticResultItem[] = []
   const highWindow: number[] = []
   const lowWindow: number[] = []
   const dSma = SMA({ candles: [], period: signalPeriod })
@@ -53,7 +53,7 @@ export function Stochastic({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         highWindow.length = 0
         lowWindow.length = 0
         for (const v of prevHighWindow) highWindow.push(v)

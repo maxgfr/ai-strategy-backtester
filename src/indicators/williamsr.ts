@@ -12,7 +12,7 @@ export function WilliamsR({
   candles: Candle[]
   period: number
 }) {
-  let result: WilliamsRResultItem[] = []
+  const result: WilliamsRResultItem[] = []
   const highWindow: number[] = []
   const lowWindow: number[] = []
   let prevHighWindow: number[] = []
@@ -45,7 +45,7 @@ export function WilliamsR({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         highWindow.length = 0
         lowWindow.length = 0
         for (const v of prevHighWindow) highWindow.push(v)

@@ -11,7 +11,7 @@ export const executeBuy = (
   const capital = lastPosition.capital - fees * lastPosition.capital
   const assets = capital / price
   const position = {
-    date,
+    date: date.toISOString(),
     type: 'buy' as const,
     price,
     capital,
@@ -33,7 +33,7 @@ export const executeSell = (
   capital = capital - fees * capital
   const tradeProfit = capital - lastPosition.capital
   const position = {
-    date,
+    date: date.toISOString(),
     type: 'sell' as const,
     price,
     capital,

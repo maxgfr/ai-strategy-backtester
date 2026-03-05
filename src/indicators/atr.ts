@@ -14,7 +14,7 @@ export function ATR({
   candles: Candle[]
   period: number
 }) {
-  let result: ATRResultItem[] = []
+  const result: ATRResultItem[] = []
   const tr = trueRange({ candles: [] })
   const rma = RMA({ candles: [], period })
 
@@ -37,7 +37,7 @@ export function ATR({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
 
       const item = calculate(candle)

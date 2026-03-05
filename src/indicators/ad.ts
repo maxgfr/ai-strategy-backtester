@@ -6,7 +6,7 @@ interface ADResultItem {
 }
 
 export function AD({ candles }: { candles: Candle[] }) {
-  let result: ADResultItem[] = []
+  const result: ADResultItem[] = []
 
   function calculate(candle: Candle): ADResultItem {
     const high = candle.high ?? candle.close
@@ -29,7 +29,7 @@ export function AD({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
       }
       const item = calculate(candle)
       result.push(item)

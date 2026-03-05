@@ -22,7 +22,7 @@ export function StochRSI({
   kPeriod: number
   dPeriod: number
 }) {
-  let result: StochRSIResultItem[] = []
+  const result: StochRSIResultItem[] = []
   const rsi = RSI({ candles: [], period: rsiPeriod })
   const rsiWindow: number[] = []
   const kSma = SMA({ candles: [], period: kPeriod })
@@ -69,7 +69,7 @@ export function StochRSI({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         rsiWindow.length = 0
         for (const v of prevRsiWindow) rsiWindow.push(v)
       }

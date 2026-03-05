@@ -12,7 +12,7 @@ export function ROC({
   candles: Candle[]
   period: number
 }) {
-  let result: ROCResultItem[] = []
+  const result: ROCResultItem[] = []
   const window: number[] = []
   let prevWindow: number[] = []
 
@@ -36,7 +36,7 @@ export function ROC({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         window.length = 0
         for (const v of prevWindow) window.push(v)
       }

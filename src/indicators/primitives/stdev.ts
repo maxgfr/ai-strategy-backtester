@@ -14,7 +14,7 @@ export function STDEV({
   candles: Candle[]
   period: number
 }) {
-  let result: STDEVResultItem[] = []
+  const result: STDEVResultItem[] = []
   let candlesStack = [...candles]
 
   const sma = SMA({ candles: [], period })
@@ -56,7 +56,7 @@ export function STDEV({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         candlesStack = candlesStack.slice(0, -1)
       }
 

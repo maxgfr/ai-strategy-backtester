@@ -16,7 +16,7 @@ export function averageLoss({
   let lossSum = 0
   let loss = 0
   let candlesStack = [...candles]
-  let result: AverageLossResultItem[] = []
+  const result: AverageLossResultItem[] = []
 
   function calculate(
     candle: Candle,
@@ -57,7 +57,7 @@ export function averageLoss({
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
         lossSum -= loss
-        result = result.slice(0, -1)
+        result.pop()
         candlesStack = candlesStack.slice(0, -1)
       }
 

@@ -12,7 +12,7 @@ export function WMA({
   candles: Candle[]
   period: number
 }) {
-  let result: WMAResultItem[] = []
+  const result: WMAResultItem[] = []
   const window: number[] = []
   const denominator = (period * (period + 1)) / 2
   let prevWindow: number[] = []
@@ -39,7 +39,7 @@ export function WMA({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         window.length = 0
         for (const v of prevWindow) window.push(v)
       }

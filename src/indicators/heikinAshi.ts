@@ -9,7 +9,7 @@ interface HeikinAshiResultItem {
 }
 
 export function HeikinAshi({ candles }: { candles: Candle[] }) {
-  let result: HeikinAshiResultItem[] = []
+  const result: HeikinAshiResultItem[] = []
   let prevOpen: number | undefined
   let prevClose: number | undefined
   let prevPrevOpen: number | undefined
@@ -49,7 +49,7 @@ export function HeikinAshi({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         prevOpen = prevPrevOpen
         prevClose = prevPrevClose
       }

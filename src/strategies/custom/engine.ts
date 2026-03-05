@@ -15,7 +15,8 @@ import type {
 
 const CANDLE_FIELDS = new Set(['close', 'high', 'low', 'open', 'volume'])
 
-type IndicatorCache = Map<string, unknown[]>
+type IndicatorValue = number | Record<string, number>
+type IndicatorCache = Map<string, IndicatorValue[]>
 
 // Maps alias → catalog indicator name (for _type support)
 type AliasMap = Map<string, string>
@@ -68,9 +69,7 @@ function resolveValue(
     const catalogName = aliasMap.get(parsed.indicator) ?? parsed.indicator
     const field = parsed.field ?? catalog[catalogName]?.defaultField
     if (!field) return undefined
-    const fieldValue = (value as Record<string, unknown>)[field]
-    if (typeof fieldValue === 'number') return fieldValue
-    return undefined
+    return value[field]
   }
 
   return undefined
@@ -165,7 +164,10 @@ function computeIndicators(
     aliasMap.set(alias, catalogName)
     const entry = catalog[catalogName]
     if (!entry) continue
-    cache.set(alias, entry.compute(candles, stripTypeParam(params)))
+    cache.set(
+      alias,
+      entry.compute(candles, stripTypeParam(params)) as IndicatorValue[],
+    )
   }
   return { cache, aliasMap }
 }

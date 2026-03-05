@@ -6,7 +6,7 @@ interface TrueRangeResultItem {
 }
 
 export function trueRange({ candles }: { candles: Candle[] }) {
-  let result: TrueRangeResultItem[] = []
+  const result: TrueRangeResultItem[] = []
   let previousClose: number | undefined
   let prevPrevClose: number | undefined
   let trueRangeValue: number
@@ -44,7 +44,7 @@ export function trueRange({ candles }: { candles: Candle[] }) {
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         previousClose = prevPrevClose
       }
 

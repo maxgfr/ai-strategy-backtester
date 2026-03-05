@@ -12,7 +12,7 @@ export function MFI({
   candles: Candle[]
   period: number
 }) {
-  let result: MFIResultItem[] = []
+  const result: MFIResultItem[] = []
   const positiveFlow: number[] = []
   const negativeFlow: number[] = []
   let prevTP: number | undefined
@@ -76,7 +76,7 @@ export function MFI({
     result: () => result,
     update: (candle: Candle) => {
       if (result.length && result[result.length - 1].time === candle.time) {
-        result = result.slice(0, -1)
+        result.pop()
         positiveFlow.length = 0
         for (const v of prevPositiveFlow) positiveFlow.push(v)
         negativeFlow.length = 0
