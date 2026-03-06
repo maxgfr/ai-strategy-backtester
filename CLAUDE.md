@@ -48,7 +48,8 @@ src/
 ├── generate.ts             # CLI entry point for AI strategy generation
 ├── simulation.ts           # Simulation engine: worker pool, metrics, funding/liquidation/stops
 ├── simulation.worker.ts    # Worker process for parallel backtesting
-├── report.ts               # HTML report generation with category comparison (Long-Only/Shorting)
+├── report.ts               # Report orchestration: load results, classify, call report-html
+├── report-html.ts          # HTML template generation (charts, tables, filters, styling)
 ├── config.ts               # Config loader (reads config.json → flat AppConfig)
 ├── data.ts                 # OHLCV data fetching (Binance) and caching to disk
 ├── database.ts             # Synchronous JSON file store (plain fs, no lowdb)
