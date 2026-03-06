@@ -27,7 +27,7 @@ describe('JSON strategies via registry', () => {
   })
 
   describe('pmax', () => {
-    const strategy = getStrategy('pmax')
+    const { fn: strategy } = getStrategy('pmax')
 
     it('returns null with empty data', () => {
       expect(strategy([])).toBeNull()
@@ -60,7 +60,7 @@ describe('JSON strategies via registry', () => {
   })
 
   describe('supertrend', () => {
-    const strategy = getStrategy('supertrend')
+    const { fn: strategy } = getStrategy('supertrend')
 
     it('returns null with empty data', () => {
       expect(strategy([])).toBeNull()
@@ -93,7 +93,7 @@ describe('JSON strategies via registry', () => {
   })
 
   describe('turtle', () => {
-    const strategy = getStrategy('turtle')
+    const { fn: strategy } = getStrategy('turtle')
 
     it('returns null with empty data', () => {
       expect(strategy([])).toBeNull()
@@ -131,7 +131,7 @@ describe('JSON strategies via registry', () => {
   })
 
   describe('confluence', () => {
-    const strategy = getStrategy('confluence')
+    const { fn: strategy } = getStrategy('confluence')
 
     it('returns null with empty data', () => {
       expect(strategy([])).toBeNull()

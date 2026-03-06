@@ -1,0 +1,34 @@
+{
+  "name": "bb-mean-reversion",
+  "description": "Bollinger Bands mean reversion — long at lower band, short at upper band, exit at middle",
+  "leverage": 2,
+  "indicators": {
+    "bollingerBands": { "period": 20, "stdDev": 2 },
+    "rsi": { "period": 14 },
+    "adx": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", "<", "bollingerBands.lower"],
+      ["rsi", "<", 35],
+      ["adx.adx", "<", 30]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", ">", "bollingerBands.middle"], ["rsi", ">", 65]]
+  },
+  "short": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "bollingerBands.upper"],
+      ["rsi", ">", 70],
+      ["adx.adx", "<", 30]
+    ]
+  },
+  "cover": {
+    "mode": "any",
+    "conditions": [["close", "<", "bollingerBands.middle"], ["rsi", "<", 40]]
+  }
+}

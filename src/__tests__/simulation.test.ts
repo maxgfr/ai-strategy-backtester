@@ -91,6 +91,10 @@ describe('strategy function contract', () => {
         actions.push('buy')
       } else if (signal === 'sell' && lastPosition.type !== 'sell') {
         actions.push('sell')
+      } else if (signal === 'short' && lastPosition.type !== 'short') {
+        actions.push('short')
+      } else if (signal === 'cover' && lastPosition.type === 'short') {
+        actions.push('cover')
       }
     }
 
@@ -106,8 +110,24 @@ describe('strategy function contract', () => {
     executeLogic('sell', { type: 'buy' })
     expect(actions).toEqual(['buy', 'sell'])
 
+    // Short signal when flat → should short
+    executeLogic('short', { type: 'sell' })
+    expect(actions).toEqual(['buy', 'sell', 'short'])
+
+    // Short signal when already short → should not short again
+    executeLogic('short', { type: 'short' })
+    expect(actions).toEqual(['buy', 'sell', 'short'])
+
+    // Cover signal when short → should cover
+    executeLogic('cover', { type: 'short' })
+    expect(actions).toEqual(['buy', 'sell', 'short', 'cover'])
+
+    // Cover signal when not short → no action
+    executeLogic('cover', { type: 'sell' })
+    expect(actions).toEqual(['buy', 'sell', 'short', 'cover'])
+
     // Null signal → no action
     executeLogic(null, { type: 'sell' })
-    expect(actions).toEqual(['buy', 'sell'])
+    expect(actions).toEqual(['buy', 'sell', 'short', 'cover'])
   })
 })

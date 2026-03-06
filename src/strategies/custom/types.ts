@@ -28,7 +28,10 @@ export type IndicatorParams = { readonly _type?: string } & Record<
 export type CustomStrategyDef = {
   readonly name: string
   readonly description: string
+  readonly leverage?: number
   readonly indicators: Record<string, IndicatorParams>
   readonly buy: SignalBlock
   readonly sell: SignalBlock
+  readonly short?: SignalBlock
+  readonly cover?: SignalBlock
 }

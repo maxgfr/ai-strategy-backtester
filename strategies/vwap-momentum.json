@@ -1,5 +1,5 @@
 {
-  "name": "st-vwap-momentum",
+  "name": "vwap-momentum",
   "description": "VWAP and Supertrend gated momentum — requires uptrend and price above VWAP, scores momentum indicators, exits on trend break",
   "indicators": {
     "vwap": {},

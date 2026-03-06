@@ -11,10 +11,17 @@ type WorkerData = {
   endDateIso: string
   strategyName: string
   dbPath: string
+  stopLossPct?: number
+  trailingStopPct?: number
 }
 
 process.on('message', (data: WorkerData) => {
   const config = loadConfig(data.configPath)
+  const strategyConfig = {
+    timeframes: [data.interval as BinanceInterval],
+    stop_loss_pct: data.stopLossPct,
+    trailing_stop_pct: data.trailingStopPct,
+  }
 
   runSingleSimulation(
     data.interval as BinanceInterval,
@@ -24,6 +31,7 @@ process.on('message', (data: WorkerData) => {
     data.dbPath,
     data.strategyName,
     config,
+    strategyConfig,
   )
     .then(() => {
       process.send?.({ type: 'done' })

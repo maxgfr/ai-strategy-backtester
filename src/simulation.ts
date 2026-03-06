@@ -7,14 +7,14 @@ import {
   buildDbModel,
   loadConfig,
   maxArraySizeForInterval,
-  type SimulationProfile,
+  type StrategyConfig,
 } from './config'
 import { readAndLoadData } from './data'
 import { Database, type IDatabase } from './database'
 import { logger } from './logger'
-import { getStrategy, listStrategiesByPattern } from './strategies/registry'
+import { getStrategy } from './strategies/registry'
 import type { StrategyFn } from './strategies/types'
-import { executeBuy, executeSell } from './trade'
+import { executeBuy, executeCover, executeSell, executeShort } from './trade'
 import type { BinanceInterval, CandleStick } from './types'
 import { formatDate, formatTimestamp, round } from './utils'
 
@@ -34,6 +34,13 @@ type WorkerData = {
   endDateIso: string
   strategyName: string
   dbPath: string
+  stopLossPct?: number
+  trailingStopPct?: number
+}
+
+function countFundingPeriods(prevTimeSec: number, currTimeSec: number): number {
+  const period = 8 * 3600 // 8 hours in seconds
+  return Math.floor(currTimeSec / period) - Math.floor(prevTimeSec / period)
 }
 
 function computeTradeStats(db: IDatabase): void {
@@ -41,10 +48,30 @@ function computeTradeStats(db: IDatabase): void {
   let closePosition = 0
   let successPosition = 0
   let failedPosition = 0
+  let longTrades = 0
+  let shortTrades = 0
+  let longWins = 0
+  let shortWins = 0
+  let longProfit = 0
+  let shortProfit = 0
+
   for (let i = 0; i < allPosition.length; i++) {
-    if (allPosition[i].tradeProfit) {
+    const pos = allPosition[i]
+    if (pos.tradeProfit !== undefined) {
       closePosition++
-      allPosition[i].tradeProfit > 0 ? successPosition++ : failedPosition++
+      pos.tradeProfit > 0 ? successPosition++ : failedPosition++
+
+      // Determine if this was a long or short trade by looking at the previous position
+      const prevPos = i > 0 ? allPosition[i - 1] : undefined
+      if (prevPos?.type === 'short') {
+        shortTrades++
+        shortProfit += pos.tradeProfit
+        if (pos.tradeProfit > 0) shortWins++
+      } else {
+        longTrades++
+        longProfit += pos.tradeProfit
+        if (pos.tradeProfit > 0) longWins++
+      }
     }
   }
   db.set('nbPosition', allPosition.length)
@@ -57,6 +84,12 @@ function computeTradeStats(db: IDatabase): void {
       ? '0%'
       : `${round((successPosition / closePosition) * 100)}%`,
   )
+  db.set('longTrades', longTrades)
+  db.set('shortTrades', shortTrades)
+  db.set('longWins', longWins)
+  db.set('shortWins', shortWins)
+  db.set('longProfit', round(longProfit))
+  db.set('shortProfit', round(shortProfit))
 }
 
 function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
@@ -100,6 +133,13 @@ function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
   db.set('avgTradeProfit', round(mean))
 }
 
+type SimulationOptions = {
+  leverage: number
+  stopLossPct?: number
+  trailingStopPct?: number
+  fundingRate: number
+}
+
 async function simulation(
   interval: BinanceInterval,
   pair: string,
@@ -109,6 +149,7 @@ async function simulation(
   strategy: StrategyFn,
   config: AppConfig,
   maxArraySize: number,
+  opts: SimulationOptions,
 ): Promise<void> {
   const db = new Database(dbPath, buildDbModel(pair, interval))
   const historic: Array<CandleStick> = await readAndLoadData(
@@ -119,8 +160,15 @@ async function simulation(
     `data/${pair}_${interval}_${formatDate(startDate)}_${formatDate(endDate)}.json`,
   )
 
-  const { fees, initialCapital } = config.trading
+  const { fees, initialCapital } = config
+  const { leverage, stopLossPct, trailingStopPct, fundingRate } = opts
   const window: CandleStick[] = []
+
+  let peakPrice = 0
+  let troughPrice = Number.POSITIVE_INFINITY
+  let accumulatedFunding = 0
+  let totalFundingPaid = 0
+  let prevTime = 0
 
   for (let i = 0; i < historic.length; i++) {
     const candle = historic[i]
@@ -139,24 +187,147 @@ async function simulation(
       })
       db.set('hodlAssets', initialAssets)
       db.set('historicPosition', [])
+      prevTime = candle.time
     }
 
     window.push(candle)
-
     const dataWindow = window.slice(Math.max(window.length - maxArraySize, 0))
 
     const lastPosition = db.get('position')
+
+    // === Funding fees (every 8h for leveraged positions) ===
+    if (
+      fundingRate > 0 &&
+      leverage > 1 &&
+      lastPosition.type !== 'sell' &&
+      i > 0
+    ) {
+      const periods = countFundingPeriods(prevTime, candle.time)
+      if (periods > 0) {
+        const fundingFee = lastPosition.assets * price * fundingRate * periods
+        accumulatedFunding += fundingFee
+        totalFundingPaid += fundingFee
+      }
+    }
+    prevTime = candle.time
+
+    // === Liquidation check (leverage only) ===
+    if (leverage > 1 && lastPosition.type === 'buy') {
+      // Long liquidation: price <= entry * (1 - 1/leverage)
+      const liqPrice = lastPosition.price * (1 - 1 / leverage)
+      if (candle.low <= liqPrice) {
+        // Liquidated — capital = 0
+        const position = {
+          date: date.toISOString(),
+          type: 'sell' as const,
+          price: liqPrice,
+          capital: 0,
+          assets: 0,
+          tradeProfit: -lastPosition.capital,
+        }
+        db.set('position', position)
+        db.push('historicPosition', position)
+        peakPrice = 0
+        accumulatedFunding = 0
+        continue
+      }
+    }
+    if (leverage > 1 && lastPosition.type === 'short') {
+      // Short liquidation: price >= entry * (1 + 1/leverage)
+      const liqPrice = lastPosition.price * (1 + 1 / leverage)
+      if (candle.high >= liqPrice) {
+        const position = {
+          date: date.toISOString(),
+          type: 'sell' as const,
+          price: liqPrice,
+          capital: 0,
+          assets: 0,
+          tradeProfit: -lastPosition.capital,
+        }
+        db.set('position', position)
+        db.push('historicPosition', position)
+        troughPrice = Number.POSITIVE_INFINITY
+        accumulatedFunding = 0
+        continue
+      }
+    }
+
+    // === Stop loss check ===
+    if (stopLossPct !== undefined && lastPosition.type === 'buy') {
+      if (price <= lastPosition.price * (1 - stopLossPct)) {
+        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        peakPrice = 0
+        accumulatedFunding = 0
+        continue
+      }
+    }
+    if (stopLossPct !== undefined && lastPosition.type === 'short') {
+      if (price >= lastPosition.price * (1 + stopLossPct)) {
+        executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        troughPrice = Number.POSITIVE_INFINITY
+        accumulatedFunding = 0
+        continue
+      }
+    }
+
+    // === Trailing stop check ===
+    if (lastPosition.type === 'buy') {
+      if (price > peakPrice) peakPrice = price
+      if (
+        trailingStopPct !== undefined &&
+        peakPrice > 0 &&
+        price <= peakPrice * (1 - trailingStopPct)
+      ) {
+        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        peakPrice = 0
+        accumulatedFunding = 0
+        continue
+      }
+    }
+    if (lastPosition.type === 'short') {
+      if (price < troughPrice) troughPrice = price
+      if (
+        trailingStopPct !== undefined &&
+        troughPrice < Number.POSITIVE_INFINITY &&
+        price >= troughPrice * (1 + trailingStopPct)
+      ) {
+        executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        troughPrice = Number.POSITIVE_INFINITY
+        accumulatedFunding = 0
+        continue
+      }
+    }
+
+    // === Strategy signal ===
     const signal = strategy(dataWindow, lastPosition.type)
 
     if (signal === 'buy' && lastPosition.type !== 'buy') {
-      executeBuy(price, date, db, fees)
+      executeBuy(price, date, db, fees, leverage)
+      peakPrice = price
+      troughPrice = Number.POSITIVE_INFINITY
+      accumulatedFunding = 0
     } else if (signal === 'sell' && lastPosition.type !== 'sell') {
-      executeSell(price, date, db, fees)
+      executeSell(price, date, db, fees, leverage, accumulatedFunding)
+      peakPrice = 0
+      accumulatedFunding = 0
+    } else if (signal === 'short' && lastPosition.type !== 'short') {
+      executeShort(price, date, db, fees, leverage)
+      troughPrice = price
+      peakPrice = 0
+      accumulatedFunding = 0
+    } else if (signal === 'cover' && lastPosition.type === 'short') {
+      executeCover(price, date, db, fees, leverage, accumulatedFunding)
+      troughPrice = Number.POSITIVE_INFINITY
+      accumulatedFunding = 0
     }
 
+    // === Final candle: close positions and compute metrics ===
     if (i === historic.length - 1) {
-      if (db.get('position').type === 'buy') {
-        executeSell(price, date, db, fees)
+      const finalType = db.get('position').type
+      if (finalType === 'buy') {
+        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+      } else if (finalType === 'short') {
+        executeCover(price, date, db, fees, leverage, accumulatedFunding)
       }
       const finalPosition = db.get('position')
       const hodlAssets = db.get('hodlAssets') ?? 0
@@ -170,6 +341,7 @@ async function simulation(
           ? '0%'
           : `${round(((finalPosition.capital - hodlMoney) / hodlMoney) * 100)}%`,
       )
+      db.set('totalFundingPaid', round(totalFundingPaid))
       computeTradeStats(db)
       computeAdvancedMetrics(db, initialCapital)
     }
@@ -186,17 +358,24 @@ export async function runSingleSimulation(
   dbPath: string,
   strategyName: string,
   config: AppConfig,
+  strategyConfig?: StrategyConfig,
 ): Promise<void> {
-  const strategy = getStrategy(strategyName)
+  const { fn, leverage } = getStrategy(strategyName, interval)
   await simulation(
     interval,
     pair,
     startDate,
     endDate,
     dbPath,
-    strategy,
+    fn,
     config,
     maxArraySizeForInterval(interval),
+    {
+      leverage,
+      stopLossPct: strategyConfig?.stop_loss_pct,
+      trailingStopPct: strategyConfig?.trailing_stop_pct,
+      fundingRate: config.fundingRate,
+    },
   )
 }
 
@@ -252,7 +431,7 @@ async function runWorkerPool(
       completed++
       const elapsed = ((Date.now() - taskStart) / 1000).toFixed(1)
       logger.info(
-        `[${completed}/${total}] ${task.strategyName} (${task.interval}) completed in ${elapsed}s`,
+        `[${completed}/${total}] ${task.strategyName} (${task.pair} ${task.interval}) completed in ${elapsed}s`,
       )
     }
   }
@@ -262,10 +441,6 @@ async function runWorkerPool(
   )
 }
 
-function resolveStrategiesForProfile(profile: SimulationProfile): string[] {
-  return listStrategiesByPattern(profile.strategies)
-}
-
 function generateRunId(): string {
   return formatTimestamp(new Date())
 }
@@ -273,7 +448,6 @@ function generateRunId(): string {
 export async function runSimulation(
   params?: SimulationParams,
   configPath?: string,
-  profileFilter?: string,
 ): Promise<string> {
   const config = loadConfig(configPath)
   const simulationStart = Date.now()
@@ -283,9 +457,8 @@ export async function runSimulation(
   logger.info(`Starting simulation (run: ${runId})`)
 
   if (params) {
-    const firstProfile = config.simulation.profiles[0]
-    const defaultStrategy = resolveStrategiesForProfile(firstProfile)[0]
-    const strategyName = params.strategy ?? defaultStrategy
+    const strategyName = params.strategy ?? Object.keys(config.strategies)[0]
+    const strategyConfig = config.strategies[strategyName]
     logger.info(
       `Running single backtest: ${strategyName} on ${params.pair} ${params.interval}`,
     )
@@ -298,97 +471,63 @@ export async function runSimulation(
       `${runFolder}/${params.pair}_${params.interval}_${strategyName}_${formatDate(params.startDate)}_${formatDate(params.endDate)}.json`,
       strategyName,
       config,
+      strategyConfig,
     )
     const singleElapsed = ((Date.now() - singleStart) / 1000).toFixed(1)
     logger.info(
       `Backtest ${strategyName} (${params.pair} ${params.interval}) completed in ${singleElapsed}s`,
     )
   } else {
-    const pairs = config.trading.pairs
+    const { symbols, dates, strategies } = config
     const allCombinations: WorkerData[] = []
-
     const uniqueData = new Map<
       string,
       { interval: BinanceInterval; pair: string; start: Date; end: Date }
     >()
 
-    const profiles = profileFilter
-      ? config.simulation.profiles.filter((p) => p.name === profileFilter)
-      : config.simulation.profiles
+    const strategyNames = Object.keys(strategies)
+    logger.info(`Symbols: ${symbols.join(', ')}`)
+    logger.info(`Strategies: ${strategyNames.length}`)
 
-    if (profileFilter && profiles.length === 0) {
-      const available = config.simulation.profiles.map((p) => p.name).join(', ')
-      logger.error(
-        `Profile "${profileFilter}" not found. Available profiles: ${available}`,
-      )
-      return
-    }
-
-    if (profileFilter) {
-      logger.info(`Filtering to profile: ${profileFilter}`)
-    }
-
-    logger.info(`Trading pairs: ${pairs.join(', ')}`)
-
-    for (const profile of profiles) {
-      const strategies = resolveStrategiesForProfile(profile)
-
-      if (strategies.length === 0) {
-        logger.warn(
-          `Profile "${profile.name}": no strategies matched patterns [${profile.strategies.join(', ')}]`,
-        )
-        continue
-      }
-
+    for (const [strategyName, strategyConfig] of Object.entries(strategies)) {
+      const { timeframes, stop_loss_pct, trailing_stop_pct } = strategyConfig
       logger.info(
-        `Profile "${profile.name}": ${strategies.length} strategies x ${profile.periods.length} periods (${profile.periods.join(', ')}) x ${pairs.length} pairs x ${profile.dates.length} date ranges`,
+        `  ${strategyName}: ${timeframes.join(', ')}${stop_loss_pct !== undefined ? ` SL=${(stop_loss_pct * 100).toFixed(0)}%` : ''}${trailing_stop_pct !== undefined ? ` TS=${(trailing_stop_pct * 100).toFixed(0)}%` : ''}`,
       )
-      logger.info(`  Strategies: ${strategies.join(', ')}`)
 
-      const combinations = pairs.flatMap((pair) =>
-        strategies.flatMap((strategyName) =>
-          profile.periods.flatMap((period) =>
-            profile.dates.map((dates) => ({
+      for (const pair of symbols) {
+        for (const tf of timeframes) {
+          for (const dateRange of dates) {
+            const dataKey = `${pair}_${tf}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}`
+            if (!uniqueData.has(dataKey)) {
+              uniqueData.set(dataKey, {
+                interval: tf,
+                pair,
+                start: dateRange.start,
+                end: dateRange.end,
+              })
+            }
+            allCombinations.push({
+              configPath,
+              interval: tf,
               pair,
+              startDateIso: dateRange.start.toISOString(),
+              endDateIso: dateRange.end.toISOString(),
               strategyName,
-              period,
-              dates,
-            })),
-          ),
-        ),
-      )
-
-      for (const { pair, period, dates } of combinations) {
-        const key = `${pair}_${period}_${formatDate(dates.start)}_${formatDate(dates.end)}`
-        if (!uniqueData.has(key)) {
-          uniqueData.set(key, {
-            interval: period,
-            pair,
-            start: dates.start,
-            end: dates.end,
-          })
+              dbPath: `${runFolder}/${pair}_${tf}_${strategyName}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}.json`,
+              stopLossPct: stop_loss_pct,
+              trailingStopPct: trailing_stop_pct,
+            })
+          }
         }
-      }
-
-      for (const { pair, strategyName, period, dates } of combinations) {
-        allCombinations.push({
-          configPath,
-          interval: period,
-          pair,
-          startDateIso: dates.start.toISOString(),
-          endDateIso: dates.end.toISOString(),
-          strategyName,
-          dbPath: `${runFolder}/${pair}_${period}_${strategyName}_${formatDate(dates.start)}_${formatDate(dates.end)}.json`,
-        })
       }
     }
 
     if (allCombinations.length === 0) {
-      logger.warn('No simulation combinations generated from any profile')
-      return
+      logger.warn('No simulation combinations generated')
+      return runId
     }
 
-    // Pre-download unique data files to avoid race conditions between workers
     logger.info(`Downloading ${uniqueData.size} unique data files...`)
     const downloadStart = Date.now()
     await Promise.all(

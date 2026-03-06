@@ -17,45 +17,55 @@ Crypto strategy backtester using Binance historical data. Entry point is a plain
 ## Architecture
 
 ```
-strategies/                          # ALL strategies as JSON (no TS strategies)
-├── pmax.json                        # PMAX trend following (long-term)
-├── supertrend.json                  # Supertrend trend following (long-term)
-├── turtle.json                      # Turtle Trading (long-term)
-├── confluence.json                  # Multi-indicator scoring (long-term)
-├── rsi-macd-buy.json                # RSI oversold + MACD buy (long-term)
-├── rsi-macd-trend-ride.json         # RSI oversold + MACD buy, RSI > 80 exit (long-term) ★ BEST
-├── breakout-volume.json             # Donchian breakout + volume (long-term)
-├── supertrend-pullback-momentum.json # Supertrend dip buyer (long-term)
-├── stochrsi-trend-filter.json       # StochRSI trend filtered (long-term)
-├── atr-trailing-vortex.json         # Vortex + ATR trailing (long-term)
-├── kdj-extreme-recovery.json        # KDJ J-line recovery (long-term)
-├── st-scalp-rsi-bb.json            # BB mean reversion scalper (short-term)
-├── st-fast-supertrend.json         # Fast Supertrend + MACD (short-term)
-├── st-vwap-momentum.json           # VWAP-gated momentum (short-term)
-└── st-kdj-ema-scalp.json           # KDJ + EMA crossover scalp (short-term)
+strategies/                          # ALL strategies as JSON (no TS strategies, no prefixes)
+├── mega-fusion.json                 # PMAX gate + scored confluence (10 indicators)
+├── rsi-macd-trend-ride.json         # RSI oversold + MACD, RSI > 80 exit ★ BEST
+├── turtle.json                      # 200-period Donchian breakout + trailing stop
+├── supertrend-pullback-momentum.json # Supertrend dip buyer
+├── supertrend.json                  # ATR-based trend following
+├── confluence.json                  # Multi-indicator scoring (PMAX + score mode)
+├── rsi-macd-buy.json                # RSI oversold + MACD histogram
+├── kdj-ema-scalp.json              # KDJ + EMA crossover scalp
+├── bollinger-squeeze.json           # BB squeeze breakout + MACD + ADX
+├── ichimoku-cloud.json              # Ichimoku cloud trend following
+├── chandelier-exit.json             # Chandelier exit + ADX trend filter
+├── mean-reversion-bb.json           # BB lower band + RSI mean reversion
+├── pmax.json                        # PMAX trend following
+├── breakout-volume.json             # Donchian breakout + volume
+├── stochrsi-trend-filter.json       # StochRSI + Supertrend + ADX
+├── atr-trailing-vortex.json         # Vortex + ATR trailing stop
+├── kdj-extreme-recovery.json        # KDJ J-line recovery
+├── fast-supertrend.json             # Fast Supertrend + MACD
+├── scalp-rsi-bb.json                # BB mean reversion + RSI + volume
+├── vwap-momentum.json               # VWAP-gated momentum
+├── supertrend-flip.json             # Long/short Supertrend flip (2x leverage)
+├── rsi-reversal.json                # RSI mean reversion long/short (2x)
+├── macd-crossover.json              # MACD crossover long/short (3x)
+├── bb-mean-reversion.json           # BB long lower / short upper (2x)
+└── vortex-trend.json                # Vortex VI+/VI- trend (2x)
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
 ├── generate.ts             # CLI entry point for AI strategy generation
-├── simulation.ts           # Simulation engine: worker pool, metrics, profile iteration
-├── simulation.worker.ts    # Worker process for parallel backtesting (accepts maxArraySize)
-├── report.ts               # HTML report generation with category comparison (short/long-term)
-├── config.ts               # Config loader (reads config.json → AppConfig, supports profiles)
+├── simulation.ts           # Simulation engine: worker pool, metrics, funding/liquidation/stops
+├── simulation.worker.ts    # Worker process for parallel backtesting
+├── report.ts               # HTML report generation with category comparison (Long-Only/Shorting)
+├── config.ts               # Config loader (reads config.json → flat AppConfig)
 ├── data.ts                 # OHLCV data fetching (Binance) and caching to disk
 ├── database.ts             # Synchronous JSON file store (plain fs, no lowdb)
-├── trade.ts                # Buy/sell execution logic (used by simulation)
+├── trade.ts                # Buy/sell/short/cover execution logic with leverage (used by simulation)
 ├── logger.ts               # Winston logger configuration
 ├── types.ts                # Core types (CandleStick, Position, DbSchema, BinanceInterval)
 ├── utils.ts                # Utilities (round, formatDate, addMonths)
 ├── strategies/
-│   ├── registry.ts         # Strategy discovery + pattern matching (*, st-*, exact names)
+│   ├── registry.ts         # Strategy discovery (JSON files), getStrategy() with timeframe
 │   ├── types.ts            # StrategyFn, Signal, StrategyName types
 │   └── custom/             # Declarative JSON strategy engine
 │       ├── types.ts        # Schema types (CustomStrategyDef, SignalBlock, Condition)
 │       ├── catalog.ts      # Indicator name → wrapper fn + metadata (35 indicators)
-│       ├── engine.ts       # JSON → StrategyFn interpreter + validator (Zod + semantic)
+│       ├── engine.ts       # JSON → StrategyFn interpreter + validator + timeframe auto-scaling
 │       └── loader.ts       # Discover & load JSON files from strategies/
 ├── schemas/                # Zod validation schemas
-│   ├── config.ts           # Config JSON schema (trading, simulation, generation, paths)
+│   ├── config.ts           # Config JSON schema (flat: fees, symbols, strategies, generation)
 │   ├── strategy.ts         # Strategy JSON schema (name, indicators, signal blocks)
 │   └── index.ts            # Re-exports
 └── indicators/             # Technical analysis — pure functions, no side effects
@@ -74,8 +84,7 @@ pnpm backtest:report          # Backtest matrix — generates report AND opens i
 pnpm backtest BTCUSDT 4h 2021-01-01 2022-01-01 pmax  # Targeted backtest
 pnpm backtest --report BTCUSDT 4h 2021-01-01 2022-01-01 pmax  # Targeted + open report
 pnpm report                   # Regenerate HTML report from existing db/ results
-pnpm generate-strategy "..."  # AI-generate a long-term strategy from natural language
-pnpm generate-strategy --short-term "..."  # AI-generate a short-term (st-*) strategy
+pnpm generate-strategy "..."  # AI-generate a strategy from natural language
 
 pnpm test                     # Vitest unit tests (run once)
 pnpm test:watch               # Vitest watch mode
@@ -113,31 +122,29 @@ This is mandatory. All four must pass:
 
 ## Configuration (`config.json`)
 
-All configuration is externalized in `config.json` at the project root. Loaded by `src/config.ts` into an `AppConfig` object.
+All configuration is externalized in `config.json` at the project root. Loaded by `src/config.ts` into an `AppConfig` object. **Flat format** — no nested `trading` or `simulation.profiles` wrappers.
 
-### Trading
+### Top-Level Fields
 
 | Field | Default | Description |
 |---|---|---|
-| `trading.pairs` | `["ETHUSDT", "BTCUSDT"]` | Trading pairs array — simulation runs matrix across all pairs |
-| `trading.from` / `trading.to` | *(optional)* | Legacy single-pair format (combined as `ETHUSDT`), used if `pairs` absent |
-| `trading.fees` | `0.0026` | Trading fees (0.26%) |
-| `trading.initialCapital` | `10000` | Starting capital |
+| `fees` | `0.0026` | Trading fees (0.26%) |
+| `fundingRate` | `0.0001` | Funding rate for perpetual futures (applied every 8h during open positions) |
+| `initialCapital` | `10000` | Starting capital |
+| `symbols` | `["ETHUSDT", "BTCUSDT", "SOLUSDT"]` | Trading pairs — simulation runs matrix across all |
+| `dates` | `[{"start": "2022-01-01", "end": "2026-02-01"}]` | Date ranges for backtesting |
 
-### Simulation Profiles
+### Per-Strategy Configuration
 
-Config supports named simulation profiles under `simulation.profiles`. Each profile has its own `maxArraySize`, `periods`, `strategies`, and `dates`. Backward-compatible with flat `simulation` format (treated as a single "default" profile).
+Each strategy is configured individually under `strategies.<name>`:
 
-| Field | Description |
-|---|---|
-| `simulation.profiles.<name>.maxArraySize` | Max candles kept in sliding window (3000 for short-term, 1000 for long-term) |
-| `simulation.profiles.<name>.periods` | Timeframes to test (e.g., `["15m","30m","1h"]` or `["4h","6h","8h"]`) |
-| `simulation.profiles.<name>.strategies` | Strategy patterns: `"*"` = all non-`st-` prefixed, `"st-*"` = all `st-` prefixed, or exact names |
-| `simulation.profiles.<name>.dates` | Date range array for backtesting |
+| Field | Required | Description |
+|---|---|---|
+| `strategies.<name>.timeframes` | Yes | Timeframes to test (e.g., `["4h", "6h"]`) |
+| `strategies.<name>.stop_loss_pct` | No | Stop loss percentage (e.g., `0.08` = 8% from entry) |
+| `strategies.<name>.trailing_stop_pct` | No | Trailing stop percentage (e.g., `0.12` = 12% retrace from peak/trough) |
 
-**Default profiles:**
-- `longTerm`: periods `4h/6h/12h`, strategies `*` (all non-st-), dates 2022-01-01 to 2026-02-01
-- `shortTerm`: periods `30m/1h/2h`, strategies `st-*`, dates 2022-01-01 to 2026-02-01
+**`maxArraySize`** is computed dynamically per interval via `maxArraySizeForInterval()`: `max(1000, round(1000 * 240 / intervalMinutes))`. Shorter timeframes get proportionally more candles.
 
 ### Generation (AI Strategy Generation)
 
@@ -147,7 +154,7 @@ Config supports named simulation profiles under `simulation.profiles`. Each prof
 | `generation.model` | `mistral-small-latest` | OpenAI-compatible model |
 | `generation.baseUrl` | `https://api.mistral.ai/v1` | API endpoint (OpenAI-compatible) |
 | `generation.maxTokens` | `4096` | Max tokens |
-| `generation.temperature` | `0.3` | Temperature |
+| `generation.temperature` | `0.7` | Temperature |
 
 ---
 
@@ -163,38 +170,39 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 
 ## Strategies (Declarative JSON — No TypeScript)
 
-**All strategies are JSON-only.** There are no hardcoded TypeScript strategies. Each strategy is a `.json` file in `strategies/` that composes indicators from the catalog.
+**All strategies are JSON-only.** No hardcoded TypeScript strategies, no prefix conventions. Each strategy is a `.json` file in `strategies/` that composes indicators from the catalog. Indicator periods auto-scale based on timeframe.
 
-### Long-Term Strategies
-
-Optimized for 4h/6h/8h timeframes. Selected by pattern `"*"` (all non-`st-` prefixed).
+### All Strategies
 
 | Strategy | File | Description |
 |----------|------|-------------|
-| **PMAX** | `pmax.json` | EMA + ATR-based Supertrend — buy when pmax equals pmaxLong |
-| **Supertrend** | `supertrend.json` | ATR-based trend-following — buy when close > supertrend |
-| **Turtle** | `turtle.json` | 200-period Donchian breakout entry, 10-period trailing stop exit (uses `_type` aliasing) |
-| **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume + ATR + EMA). Score mode with threshold. |
-| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive entry, RSI > 70 exit |
-| **RSI-MACD Trend Ride** | `rsi-macd-trend-ride.json` | RSI oversold + MACD positive entry, RSI > 80 exit — holds longer for bigger gains ★ BEST |
-| **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX trending + volume confirmation |
-| **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover (oversold zone) in Supertrend uptrend + ADX + MACD — optimized for 6h |
-| **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend uptrend + RSI below 50 pullback + MACD positive + ADX — buy-the-dip, optimized for 6h |
-| **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex VI+/VI- crossover + ATR trailing stop exit + ADX + MACD — trend inception with dynamic trailing stop |
-| **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery from extreme oversold (< 0 to > 20) in Supertrend uptrend — catches V-shaped reversals |
+| **Mega Fusion** | `mega-fusion.json` | PMAX gate + 10-indicator scored confluence |
+| **RSI-MACD Trend Ride** | `rsi-macd-trend-ride.json` | RSI oversold + MACD positive entry, RSI > 80 exit ★ BEST |
+| **Turtle** | `turtle.json` | 200-period Donchian breakout + trailing stop exit (`_type` aliasing) |
+| **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend dip buyer + RSI pullback + MACD + ADX |
+| **Supertrend** | `supertrend.json` | ATR-based trend-following |
+| **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume) |
+| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive, RSI > 70 exit |
+| **KDJ EMA Scalp** | `kdj-ema-scalp.json` | KDJ + EMA crossover scalp |
+| **Bollinger Squeeze** | `bollinger-squeeze.json` | BB squeeze breakout + MACD + ADX |
+| **Ichimoku Cloud** | `ichimoku-cloud.json` | Ichimoku cloud trend following |
+| **Chandelier Exit** | `chandelier-exit.json` | Chandelier exit + ADX trend filter |
+| **Mean Reversion BB** | `mean-reversion-bb.json` | BB lower band + RSI mean reversion |
+| **PMAX** | `pmax.json` | EMA + ATR-based Supertrend trend following |
+| **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX + volume confirmation |
+| **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover in Supertrend uptrend + ADX |
+| **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex crossover + ATR trailing stop + ADX + MACD |
+| **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery in Supertrend uptrend |
+| **Fast Supertrend** | `fast-supertrend.json` | Fast Supertrend + MACD + ADX |
+| **Scalp RSI BB** | `scalp-rsi-bb.json` | BB mean reversion + RSI oversold + volume |
+| **VWAP Momentum** | `vwap-momentum.json` | VWAP-gated score mode momentum |
+| **Supertrend Flip** | `supertrend-flip.json` | Long/short Supertrend flip (2x leverage) |
+| **RSI Reversal** | `rsi-reversal.json` | RSI mean reversion long/short (2x) |
+| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (3x) |
+| **BB Mean Reversion** | `bb-mean-reversion.json` | BB long lower / short upper (2x) |
+| **Vortex Trend** | `vortex-trend.json` | Vortex VI+/VI- trend long/short (2x) |
 
-### Short-Term Strategies
-
-Optimized for 15m/30m/1h timeframes. Prefixed with `st-`, selected by pattern `"st-*"`. Parameters tuned for faster signals.
-
-| Strategy | File | Description |
-|----------|------|-------------|
-| **ST Scalp RSI BB** | `st-scalp-rsi-bb.json` | BB(12) mean reversion + RSI(7) oversold + volume spike above SMA(10) |
-| **ST Fast Supertrend** | `st-fast-supertrend.json` | Fast Supertrend(5,2) + fast MACD(6,13,5) + ADX(10) trend filter |
-| **ST VWAP Momentum** | `st-vwap-momentum.json` | VWAP gate + score mode with ROC(5)/MFI(7)/volumeSma(10)/RSI(7) |
-| **ST KDJ EMA Scalp** | `st-kdj-ema-scalp.json` | KDJ(5,2,2) J-extreme recovery + EMA(5)/EMA(13) crossover + volume |
-
-The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories. Each returns `Signal = 'buy' | 'sell' | null`.
+The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories, no pattern matching. Each returns `Signal = 'buy' | 'sell' | 'short' | 'cover'`.
 
 ### JSON Strategy Format
 
@@ -202,9 +210,12 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 {
   "name": "kebab-case-name",
   "description": "What this strategy does",
+  "leverage": 2,
   "indicators": { "rsi": { "period": 14 }, "macd": { "fast": 12, "slow": 26, "signal": 9 } },
   "buy": { "mode": "all", "conditions": [["rsi", "<", 35], ["macd.histogram", ">", 0]] },
-  "sell": { "mode": "any", "conditions": [["rsi", ">", 70]] }
+  "sell": { "mode": "any", "conditions": [["rsi", ">", 70]] },
+  "short": { "mode": "all", "conditions": [["rsi", ">", 80]] },
+  "cover": { "mode": "all", "conditions": [["rsi", "<", 40]] }
 }
 ```
 
@@ -212,11 +223,17 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 
 **Signal modes:** `all` (AND), `any` (OR), `score` (count-based with threshold + optional required conditions).
 
+**Shorting support:** Strategies can optionally define `"short"` and `"cover"` blocks (both must be present or both absent). When flat, `buy` is checked first, then `short`. When holding long, only `sell` is checked. When holding short, only `cover` is checked. Short trades profit from price decreases.
+
+**Leverage:** Optional `"leverage"` field (1–125, default 1). Amplifies position size: `assets = capital * leverage / price`. On long exit, borrowed amount `capital * (leverage - 1)` is deducted. On short exit, PnL is naturally amplified through the larger position. Capital clamped at 0 (liquidation).
+
 **`_type` aliasing:** Use `{"_type": "donchian", "period": 200}` to create multiple instances of the same indicator under different aliases (e.g., turtle uses `"breakout"` and `"exit"` both backed by donchian).
 
 **35 indicators available** in the catalog (`src/strategies/custom/catalog.ts`): rsi, ema, supertrend, bollingerBands, obv, vwap, cmf, williamsR, cci, roc, ad, mfi, psar, ao, movingAverage, trix, volumeOscillator, macd, pmax, adx, donchian, stochastic, aroon, ichimoku, vortex, chandelier, keltner, starcBands, movingAverageEnvelope, atrTrailingStop, pmo, kdj, stochRsi, volumeSma, atrRatio.
 
-**AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — generates a long-term strategy. Add `--short-term` flag to generate a `st-*` prefixed strategy with shorter indicator periods tuned for 15m/30m/1h timeframes. The LLM receives category-specific guidance (parameter cheat sheet, naming rules).
+**Timeframe auto-scaling:** Indicator periods automatically scale based on the running timeframe relative to the 4h reference. Uses sqrt dampening: `scale = sqrt(240 / tfMinutes)`. Only period-like params (period, fast, slow, signal, etc.) are scaled; multiplier/stdDev stay fixed. Minimum period is 2.
+
+**AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — generates a strategy. Indicator periods should be tuned for 4h (the reference timeframe); auto-scaling handles other timeframes.
 
 **Manual generation:** When the user asks to create or generate a strategy (without using `pnpm generate-strategy`), follow the spec in `STRATEGY_PROMPT.md` at the project root. It contains the full JSON schema, all 35 indicators with parameters and fields, value reference syntax, and examples. Write the JSON file directly to `strategies/` — it will be auto-discovered on the next backtest.
 
@@ -225,15 +242,17 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 ## Backtesting Architecture
 
 - **Single backtest**: `pnpm backtest PAIR INTERVAL START END STRATEGY` — runs in main process
-- **Full matrix**: `pnpm backtest` (no args) — iterates over all simulation profiles, resolves strategy patterns per profile, pre-downloads data, then dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
-- Each worker receives `maxArraySize` from its profile (3000 for short-term, 1000 for long-term)
+- **Full matrix**: `pnpm backtest` (no args) — iterates over `config.strategies` map, crosses each strategy's `timeframes` with `symbols` and `dates`, dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
+- Each worker receives `maxArraySize` computed dynamically from interval, plus per-strategy `stop_loss_pct` and `trailing_stop_pct`
 - Each run creates `db/{runId}/` with results as `{pair}_{interval}_{strategy}_{start}_{end}.json`
 - `runId` is an auto-generated timestamp (`YYYYMMDD_HHmmss`) — concurrent runs never collide
+- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, separate long/short trade metrics
 - Report generated as `reports/report_<timestamp>.html` (unique per run, no overwrite) with:
-  - **Category comparison cards** (best long-term vs best short-term side by side)
-  - **Filter buttons** (All / Long-Term / Short-Term) to toggle rankings and averages tables
-  - **Category badges** on each row showing Short-Term (blue) or Long-Term (green)
-  - Classification based on interval: 1m/3m/5m/15m/30m/1h/2h = Short-Term, 4h+ = Long-Term
+  - **Category comparison cards** (best Long-Only vs best Shorting side by side)
+  - **Filter buttons** (All / Long-Only / Shorting) to toggle rankings and averages tables
+  - **Category badges**: Long-Only (green), Shorting (purple)
+  - Classification is data-driven: `shortTrades > 0` = Shorting, else Long-Only
+  - Chart markers: purple arrows for SHORT entries, labels distinguish SELL vs COVER on exits
 
 ---
 
@@ -242,14 +261,15 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 Core types in `src/types.ts`:
 
 ```typescript
-type Position = 'buy' | 'sell'
-type Signal = 'buy' | 'sell'                    // in strategies/types.ts
-type StrategyName = string                       // builtin: pmax, supertrend, turtle, confluence + custom
+type Position = 'buy' | 'sell' | 'short'
+type Signal = 'buy' | 'sell' | 'short' | 'cover' // in strategies/types.ts
+type ResolvedStrategy = { fn: StrategyFn, leverage: number }  // returned by getStrategy()
 type CandleStick = { open, high, close, low, volume, time }
 type LastPosition = { date, type, price, capital, assets, tradeProfit? }
-type DbSchema = { version, initialParameters, historicPosition, position, ...metrics }
-type SimulationProfile = { name, maxArraySize, periods, strategies, dates }  // in config.ts
-type AppConfig = { trading: { pairs, fees, initialCapital }, simulation: { profiles: SimulationProfile[] }, generation, paths }
+type DbSchema = { version, initialParameters, historicPosition, position, ...metrics,
+                  longTrades?, shortTrades?, longWins?, shortWins?, longProfit?, shortProfit?, totalFundingPaid? }
+type StrategyConfig = { timeframes, stop_loss_pct?, trailing_stop_pct? }  // in config.ts
+type AppConfig = { fees, fundingRate, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, paths }
 ```
 
 ---
@@ -314,7 +334,7 @@ When creating or reviewing strategies, apply these proven insights:
 - **PMAX EMA input** is `hl2 = (high + low) / 2`, not `close`
 - **KDJ** uses SMA for K and D smoothing (not EMA)
 - **Supertrend** first bar defaults to basic bands (not 0)
-- **Strategy evaluation is position-aware**: when holding (`positionType='buy'`), only sell conditions are checked; when flat (`positionType='sell'` or undefined), only buy conditions are checked
+- **Strategy evaluation is position-aware**: when long (`positionType='buy'`), only sell is checked; when short (`positionType='short'`), only cover is checked; when flat (`positionType='sell'` or undefined), buy is checked first, then short
 
 ---
 

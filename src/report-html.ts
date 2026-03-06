@@ -20,12 +20,12 @@ export type SimulationResult = {
     avgTradeProfit?: number
     historicPosition?: LastPosition[]
   }
-  category: 'Short-Term' | 'Long-Term'
+  category: 'Long-Only' | 'Shorting'
 }
 
 type StrategyAverage = {
   strategy: string
-  category: 'Short-Term' | 'Long-Term'
+  category: 'Long-Only' | 'Shorting'
   count: number
   avgInitialCapital: number
   avgFinalCapital: number
@@ -91,6 +91,11 @@ function computeStrategyAverages(
   return averages.sort((a, b) => b.avgFinalCapital - a.avgFinalCapital)
 }
 
+function categoryBadgeClass(category: 'Long-Only' | 'Shorting'): string {
+  if (category === 'Shorting') return 'cat-shorting'
+  return 'cat-long'
+}
+
 function colorClass(value: number): string {
   if (value > 0) return 'positive'
   if (value < 0) return 'negative'
@@ -136,7 +141,7 @@ function buildStyles(): string {
     h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
     .header { margin-bottom: 2rem; border-bottom: 1px solid #30363d; padding-bottom: 1rem; }
     .header-meta { color: #8b949e; font-size: 0.9rem; }
-    .comparison-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .comparison-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
     .best-card { background: linear-gradient(135deg, #1a2332, #1e293b); border: 1px solid #2d6a4f; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
     .comparison-row .best-card { margin-bottom: 0; }
     .best-card h2 { color: #40c057; margin-bottom: 1rem; font-size: 1.3rem; }
@@ -151,7 +156,7 @@ function buildStyles(): string {
     .filter-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
     .category-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
     .cat-long { background: #2d6a4f33; color: #40c057; }
-    .cat-short { background: #1864ab33; color: #339af0; }
+    .cat-shorting { background: #5c1a7a33; color: #be4bdb; }
     h2.section-title { font-size: 1.2rem; margin: 2rem 0 1rem; color: #c9d1d9; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th { background: #161b22; color: #8b949e; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; padding: 0.75rem; text-align: left; border-bottom: 2px solid #30363d; cursor: pointer; user-select: none; white-space: nowrap; }
@@ -305,6 +310,10 @@ function buildChartScript(
           var tradeTime = Math.floor(new Date(trade.date).getTime() / 1000);
           var closest = findClosestTime(candleTimes, tradeTime);
 
+          var pText = '';
+          if (trade.tradeProfit != null) {
+            pText = ' (' + (trade.tradeProfit > 0 ? '+' : '') + '$' + trade.tradeProfit.toFixed(0) + ')';
+          }
           if (trade.type === 'buy') {
             markers.push({
               time: closest,
@@ -313,17 +322,21 @@ function buildChartScript(
               shape: 'arrowUp',
               text: 'BUY $' + trade.price.toFixed(2),
             });
+          } else if (trade.type === 'short') {
+            markers.push({
+              time: closest,
+              position: 'aboveBar',
+              color: '#be4bdb',
+              shape: 'arrowDown',
+              text: 'SHORT $' + trade.price.toFixed(2),
+            });
           } else {
-            var pText = '';
-            if (trade.tradeProfit != null) {
-              pText = ' (' + (trade.tradeProfit > 0 ? '+' : '') + '$' + trade.tradeProfit.toFixed(0) + ')';
-            }
             markers.push({
               time: closest,
               position: 'aboveBar',
               color: '#f03e3e',
               shape: 'arrowDown',
-              text: 'SELL $' + trade.price.toFixed(2) + pText,
+              text: (trade.type === 'sell' ? 'SELL' : 'COVER') + ' $' + trade.price.toFixed(2) + pText,
             });
           }
         }
@@ -358,7 +371,7 @@ function buildChartScript(
     for (var i = 0; i < trades.length; i++) {
       var t = trades[i];
       var date = new Date(t.date).toLocaleDateString('en-CA');
-      var typeClass = t.type === 'buy' ? 'positive' : 'negative';
+      var typeClass = t.type === 'buy' ? 'positive' : (t.type === 'short' ? '' : 'negative');
       var profitCell = '\\u2014';
       if (t.tradeProfit != null) {
         var pClass = t.tradeProfit > 0 ? 'positive' : 'negative';
@@ -508,28 +521,27 @@ function buildComparisonCards(
   results: SimulationResult[],
   sorted: SimulationResult[],
 ): string {
-  const hasShortTerm = results.some((r) => r.category === 'Short-Term')
-  const hasLongTerm = results.some((r) => r.category === 'Long-Term')
-  const hasBothCategories = hasShortTerm && hasLongTerm
+  const hasLongOnly = results.some((r) => r.category === 'Long-Only')
+  const hasShorting = results.some((r) => r.category === 'Shorting')
+  const categoryCount = (hasLongOnly ? 1 : 0) + (hasShorting ? 1 : 0)
 
   const cards: string[] = []
 
-  if (hasBothCategories) {
-    const bestLT = sorted.find((r) => r.category === 'Long-Term')
-    const bestST = sorted.find((r) => r.category === 'Short-Term')
-    cards.push(`<div class="comparison-row">
-        ${buildBestCard('Best Long-Term', bestLT, '#40c057', '#2d6a4f')}
-        ${buildBestCard('Best Short-Term', bestST, '#339af0', '#1864ab')}
-      </div>`)
+  if (categoryCount > 1) {
+    const bestLO = sorted.find((r) => r.category === 'Long-Only')
+    const bestSH = sorted.find((r) => r.category === 'Shorting')
+    const categoryCards = [
+      buildBestCard('Best Long-Only', bestLO, '#40c057', '#2d6a4f'),
+      buildBestCard('Best Shorting', bestSH, '#be4bdb', '#5c1a7a'),
+    ]
+      .filter(Boolean)
+      .join('')
+    cards.push(`<div class="comparison-row">${categoryCards}</div>`)
   } else {
-    cards.push(
-      buildBestCard(
-        hasShortTerm ? 'Best Short-Term' : 'Best Long-Term',
-        sorted[0],
-        hasShortTerm ? '#339af0' : '#40c057',
-        hasShortTerm ? '#1864ab' : '#2d6a4f',
-      ),
-    )
+    const label = hasShorting ? 'Best Shorting' : 'Best Long-Only'
+    const accent = hasShorting ? '#be4bdb' : '#40c057'
+    const border = hasShorting ? '#5c1a7a' : '#2d6a4f'
+    cards.push(buildBestCard(label, sorted[0], accent, border))
   }
 
   // Per-pair best cards when multiple pairs
@@ -548,23 +560,35 @@ function buildComparisonCards(
 }
 
 function buildFilterButtons(results: SimulationResult[]): string {
-  const hasShortTerm = results.some((r) => r.category === 'Short-Term')
-  const hasLongTerm = results.some((r) => r.category === 'Long-Term')
+  const hasLongOnly = results.some((r) => r.category === 'Long-Only')
+  const hasShorting = results.some((r) => r.category === 'Shorting')
   const uniquePairs = [...new Set(results.map((r) => r.pair))].sort()
   const hasMultiplePairs = uniquePairs.length > 1
+  const catCount = (hasLongOnly ? 1 : 0) + (hasShorting ? 1 : 0)
 
-  if (!hasShortTerm && !hasLongTerm && !hasMultiplePairs) return ''
+  if (catCount < 2 && !hasMultiplePairs) return ''
 
   let html = ''
 
-  if (hasShortTerm && hasLongTerm) {
-    const longCount = results.filter((r) => r.category === 'Long-Term').length
-    const shortCount = results.filter((r) => r.category === 'Short-Term').length
-    html += `<div class="filter-bar">
-        <button class="filter-btn active" data-filter="all" data-filter-type="category">All (${results.length})</button>
-        <button class="filter-btn" data-filter="Long-Term" data-filter-type="category">Long-Term (${longCount})</button>
-        <button class="filter-btn" data-filter="Short-Term" data-filter-type="category">Short-Term (${shortCount})</button>
-      </div>`
+  if (catCount >= 2) {
+    const longOnlyCount = results.filter(
+      (r) => r.category === 'Long-Only',
+    ).length
+    const shortingCount = results.filter(
+      (r) => r.category === 'Shorting',
+    ).length
+    const buttons = [
+      `<button class="filter-btn active" data-filter="all" data-filter-type="category">All (${results.length})</button>`,
+    ]
+    if (hasLongOnly)
+      buttons.push(
+        `<button class="filter-btn" data-filter="Long-Only" data-filter-type="category">Long-Only (${longOnlyCount})</button>`,
+      )
+    if (hasShorting)
+      buttons.push(
+        `<button class="filter-btn" data-filter="Shorting" data-filter-type="category">Shorting (${shortingCount})</button>`,
+      )
+    html += `<div class="filter-bar">${buttons.join('\n        ')}</div>`
   }
 
   if (hasMultiplePairs) {
@@ -590,7 +614,7 @@ function buildAveragesTable(results: SimulationResult[]): string {
       (a) =>
         `<tr data-category="${a.category}">
           <td><strong>${a.strategy.toUpperCase()}</strong></td>
-          <td><span class="category-badge ${a.category === 'Short-Term' ? 'cat-short' : 'cat-long'}">${a.category}</span></td>
+          <td><span class="category-badge ${categoryBadgeClass(a.category)}">${a.category}</span></td>
           <td>${a.count}</td>
           <td>$${a.avgInitialCapital.toLocaleString()}</td>
           <td>$${a.avgFinalCapital.toLocaleString()}</td>
@@ -625,7 +649,7 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <td>${i + 1}</td>
           <td>${r.strategy.toUpperCase()}</td>
           <td>${r.pair}</td>
-          <td><span class="category-badge ${r.category === 'Short-Term' ? 'cat-short' : 'cat-long'}">${r.category}</span></td>
+          <td><span class="category-badge ${categoryBadgeClass(r.category)}">${r.category}</span></td>
           <td>${r.interval}</td>
           <td>${r.startDate} \u2192 ${r.endDate}</td>
           <td>$${round(r.data.initialCapital ?? 0).toLocaleString()}</td>

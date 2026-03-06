@@ -1,5 +1,5 @@
 {
-  "name": "st-fast-supertrend",
+  "name": "fast-supertrend",
   "description": "Supertrend uptrend with RSI pullback entry — buy dips in confirmed trend, exit only on trend break",
   "indicators": {
     "supertrend": { "atrPeriod": 10, "multiplier": 3 },

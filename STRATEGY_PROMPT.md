@@ -6,24 +6,12 @@ Your output must be a single valid JSON object following the schema below. No ex
 
 ---
 
-## Strategy Categories
+## Strategy Design
 
-There are two categories of strategies, each with different naming and parameter conventions:
-
-### Long-Term (4h, 6h, 8h timeframes)
-- Name: `kebab-case-name` (no prefix)
-- Indicator periods: standard defaults (RSI 14, MACD 12/26/9, ADX 14, etc.)
-- Fewer trades, hold for days/weeks
-- Focus on trend following, breakouts, swing reversals
-
-### Short-Term (15m, 30m, 1h timeframes)
-- Name: **must start with `st-`** (e.g., `st-scalp-rsi-bb`)
-- Indicator periods: **shorter** (RSI 7, MACD 6/13/5, ADX 10, Supertrend 5/2, etc.)
-- More trades, hold for minutes/hours
-- Focus on scalping, mean reversion, quick momentum
-- Use `volumeSma` with short period (10) for volume spike detection
-- Use faster Bollinger/Keltner bands (period 10-12)
-- Use `maxArraySize: 3000` in simulation config (more candles needed for warmup)
+- Name: `kebab-case-name` (no prefixes)
+- Indicator periods: use **standard 4h defaults** (RSI 14, MACD 12/26/9, ADX 14, etc.)
+- **Timeframe auto-scaling**: indicator periods automatically scale based on the running timeframe. Strategies are designed for 4h reference; the engine adjusts periods for other intervals using `sqrt(240 / tfMinutes)`. Only period-like params are scaled; multiplier/stdDev stay fixed.
+- Strategies can optionally go both long and short by adding `short` + `cover` blocks with `leverage`
 
 ---
 
@@ -33,6 +21,7 @@ There are two categories of strategies, each with different naming and parameter
 {
   "name": "kebab-case-name",
   "description": "Short description of what the strategy does",
+  "leverage": 1,
   "indicators": {
     "indicatorName": { "param1": value, "param2": value }
   },
@@ -43,9 +32,25 @@ There are two categories of strategies, each with different naming and parameter
   "sell": {
     "mode": "all" | "any" | "score",
     "conditions": [["valueRef", "op", "valueRef"], ...]
+  },
+  "short": {
+    "mode": "all" | "any" | "score",
+    "conditions": [["valueRef", "op", "valueRef"], ...]
+  },
+  "cover": {
+    "mode": "all" | "any" | "score",
+    "conditions": [["valueRef", "op", "valueRef"], ...]
   }
 }
 ```
+
+### Shorting & Leverage (optional)
+
+- **`leverage`**: Position size multiplier (1–125, default 1). Amplifies both gains and losses.
+- **`short`**: Signal block for opening a short position (profit from price decrease). Same format as `buy`/`sell`.
+- **`cover`**: Signal block for closing a short position. Same format as `buy`/`sell`.
+- **Both `short` and `cover` must be present together** — you cannot define one without the other.
+- When holding a long position, only `sell` is evaluated. When holding a short position, only `cover` is evaluated. When flat, `buy` is checked first, then `short`.
 
 ### Score mode (optional)
 
@@ -162,11 +167,13 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 1. Only use indicators listed above
 2. Only reference fields that exist for each indicator (see Fields column)
 3. Every indicator referenced in conditions MUST be declared in `"indicators"`
-4. Use `kebab-case` for the strategy name
-5. **Short-term strategies MUST have name starting with `st-`**
+4. Use `kebab-case` for the strategy name (no prefixes required)
+5. **Tune indicator periods for 4h** — auto-scaling handles other timeframes
 6. **Alias names: letters only** `[a-zA-Z]+` — no numbers (e.g., `emaSlow` not `ema50`)
 7. **Score mode uses `scored` array** — NOT `conditions`
-8. Output ONLY the raw JSON object
+8. **Both `short` and `cover` must be present together** — cannot define one without the other
+9. **`leverage` must be between 1 and 125** (default 1 if omitted)
+10. Output ONLY the raw JSON object
 
 ---
 
@@ -280,16 +287,16 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 }
 ```
 
-### Short-term: BB mean reversion scalper
+### BB mean reversion scalper
 
 ```json
 {
-  "name": "st-scalp-rsi-bb",
+  "name": "scalp-rsi-bb",
   "description": "BB mean reversion scalper — buy near lower band when RSI oversold and volume spikes",
   "indicators": {
-    "bollingerBands": { "period": 12, "stdDev": 2 },
-    "rsi": { "period": 7 },
-    "volumeSma": { "period": 10 }
+    "bollingerBands": { "period": 20, "stdDev": 2 },
+    "rsi": { "period": 14 },
+    "volumeSma": { "period": 20 }
   },
   "buy": {
     "mode": "all",
@@ -306,48 +313,47 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 }
 ```
 
-### Short-term: VWAP-gated score mode
+### Shorting: Supertrend flip long/short (2x leverage)
 
 ```json
 {
-  "name": "st-vwap-momentum",
-  "description": "VWAP-gated momentum scalper with score-based entry",
+  "name": "supertrend-flip",
+  "description": "Always in position — long above Supertrend, short below with 2x leverage",
+  "leverage": 2,
   "indicators": {
-    "vwap": {},
-    "roc": { "period": 5 },
-    "mfi": { "period": 7 },
-    "volumeSma": { "period": 10 },
-    "rsi": { "period": 7 }
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "adx": { "period": 14 }
   },
   "buy": {
-    "mode": "score",
-    "threshold": 3,
-    "required": [["close", ">", "vwap"]],
-    "scored": [
-      ["roc", ">", 0],
-      ["mfi", "<", 40],
-      ["volume", ">", "volumeSma"],
-      ["rsi", "<", 45]
-    ]
+    "mode": "all",
+    "conditions": [["close", ">", "supertrend"], ["adx.adx", ">", 20]]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["close", "<", "vwap"], ["rsi", ">", 75], ["mfi", ">", 80]]
+    "conditions": [["close", "<", "supertrend"]]
+  },
+  "short": {
+    "mode": "all",
+    "conditions": [["close", "<", "supertrend"], ["adx.adx", ">", 20]]
+  },
+  "cover": {
+    "mode": "any",
+    "conditions": [["close", ">", "supertrend"]]
   }
 }
 ```
 
-### Short-term: Fast EMA crossover + KDJ (with aliasing)
+### Aliasing: Fast EMA crossover + KDJ
 
 ```json
 {
-  "name": "st-kdj-ema-scalp",
-  "description": "KDJ J-extreme recovery + fast EMA crossover + volume spike",
+  "name": "kdj-ema-scalp",
+  "description": "KDJ J-extreme recovery + EMA crossover + volume spike",
   "indicators": {
-    "kdj": { "rsvPeriod": 5, "kPeriod": 2, "dPeriod": 2 },
-    "emaFast": { "_type": "ema", "period": 5 },
-    "emaSlow": { "_type": "ema", "period": 13 },
-    "volumeSma": { "period": 10 }
+    "kdj": { "rsvPeriod": 9, "kPeriod": 3, "dPeriod": 3 },
+    "emaFast": { "_type": "ema", "period": 10 },
+    "emaSlow": { "_type": "ema", "period": 26 },
+    "volumeSma": { "period": 20 }
   },
   "buy": {
     "mode": "all",
@@ -363,30 +369,6 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
   }
 }
 ```
-
----
-
-## Short-Term Parameter Cheat Sheet
-
-When designing `st-*` strategies, use shorter periods:
-
-| Indicator | Long-Term Default | Short-Term Recommended |
-|-----------|------------------|----------------------|
-| `rsi` | `period: 14` | `period: 7` |
-| `macd` | `fast: 12, slow: 26, signal: 9` | `fast: 6, slow: 13, signal: 5` |
-| `adx` | `period: 14` | `period: 10` |
-| `supertrend` | `atrPeriod: 10, multiplier: 3` | `atrPeriod: 5, multiplier: 2` |
-| `bollingerBands` | `period: 20` | `period: 12` |
-| `keltner` | `maPeriod: 20, atrPeriod: 10` | `maPeriod: 10, atrPeriod: 10` |
-| `volumeSma` | `period: 20` | `period: 10` |
-| `cmf` | `period: 20` | `period: 10` |
-| `mfi` | `period: 14` | `period: 7` |
-| `roc` | `period: 12` | `period: 5` |
-| `stochRsi` | `rsiPeriod: 14, stochasticPeriod: 14` | `rsiPeriod: 7, stochasticPeriod: 7` |
-| `kdj` | `rsvPeriod: 9, kPeriod: 3, dPeriod: 3` | `rsvPeriod: 5, kPeriod: 2, dPeriod: 2` |
-| `psar` | `step: 0.02, max: 0.2` | `step: 0.03, max: 0.25` |
-| `donchian` | `period: 50-200` | `period: 10-20` |
-| `ema` | `period: 20-50` | `period: 5-13` |
 
 ---
 
@@ -443,17 +425,17 @@ Use these as reference when setting condition thresholds:
 
 ## Strategy Ideas to Try
 
-### Long-Term
+### Long-Only
 - Ichimoku cloud breakout with volume confirmation
 - Keltner channel squeeze breakout
 - CMF accumulation + Aroon trend confirmation
 - Multi-timeframe moving average crossover (fast/slow EMA)
-
-### Short-Term
 - StochRSI bounce from lower Keltner band
-- PSAR reversal + ROC momentum + CMF flow
-- Fast Supertrend + MACD histogram cross
-- KDJ extreme recovery + EMA crossover
 - VWAP gate + multi-indicator score
-- Micro Donchian breakout (20/5) with volume spike
-- Bollinger lower band touch + RSI oversold + volume
+
+### Long/Short (with leverage)
+- Supertrend directional flip — long above, short below (2x)
+- RSI mean reversion — long oversold, short overbought + MACD (2x)
+- MACD crossover — long bullish cross, short bearish cross in trend (3x)
+- Bollinger Bands — long lower band, short upper band with volume (2x)
+- Vortex trend — VI+/VI- crossover for direction + ATR trailing stop (2x)

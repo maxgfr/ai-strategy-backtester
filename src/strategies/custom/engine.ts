@@ -1,6 +1,6 @@
 import type { ZodError, ZodIssue } from 'zod'
 import { StrategyDefSchema } from '../../schemas/strategy'
-import type { CandleStick } from '../../types'
+import type { BinanceInterval, CandleStick } from '../../types'
 import type { PositionType, Signal, StrategyFn } from '../types'
 import { type CatalogEntry, catalog } from './catalog'
 import type {
@@ -18,6 +18,90 @@ type IndicatorCache = Map<string, IndicatorValue[]>
 
 // Maps alias → catalog indicator name (for _type support)
 type AliasMap = Map<string, string>
+
+// === Timeframe auto-scaling ===
+
+const TIMEFRAME_MINUTES: Record<string, number> = {
+  '1m': 1,
+  '3m': 3,
+  '5m': 5,
+  '15m': 15,
+  '30m': 30,
+  '1h': 60,
+  '2h': 120,
+  '4h': 240,
+  '6h': 360,
+  '8h': 480,
+  '12h': 720,
+  '1d': 1440,
+  '3d': 4320,
+  '1w': 10080,
+}
+
+const REFERENCE_MINUTES = 240 // 4h is the reference timeframe
+
+// Params that represent periods (should be scaled). All others (multiplier, stdDev, etc.) stay fixed.
+const PERIOD_PARAMS = new Set([
+  'period',
+  'fast',
+  'slow',
+  'signal',
+  'emaPeriod',
+  'atrPeriod',
+  'rsiPeriod',
+  'stochasticPeriod',
+  'kPeriod',
+  'dPeriod',
+  'rsvPeriod',
+  'conversionPeriod',
+  'basePeriod',
+  'spanPeriod',
+  'maPeriod',
+  'smaPeriod',
+  'fastPeriod',
+  'slowPeriod',
+  'signalPeriod',
+  'smooth1Period',
+  'smooth2Period',
+])
+
+function scaleIndicatorParams(
+  params: IndicatorParams,
+  timeframe: BinanceInterval,
+): IndicatorParams {
+  const tfMinutes = TIMEFRAME_MINUTES[timeframe]
+  if (!tfMinutes || tfMinutes === REFERENCE_MINUTES) return params
+
+  // Scale factor: sqrt dampening to avoid extreme values
+  // Shorter timeframes → larger periods, longer timeframes → smaller periods
+  const ratio = REFERENCE_MINUTES / tfMinutes
+  const scale = Math.sqrt(ratio)
+
+  const scaled: Record<string, number | string | undefined> = {}
+  for (const [key, value] of Object.entries(params)) {
+    if (key === '_type' || typeof value !== 'number') {
+      scaled[key] = value
+    } else if (PERIOD_PARAMS.has(key)) {
+      scaled[key] = Math.max(2, Math.round(value * scale))
+    } else {
+      scaled[key] = value
+    }
+  }
+  return scaled as IndicatorParams
+}
+
+function scaleStrategyForTimeframe(
+  def: CustomStrategyDef,
+  timeframe: BinanceInterval,
+): CustomStrategyDef {
+  const scaledIndicators: Record<string, IndicatorParams> = {}
+  for (const [alias, params] of Object.entries(def.indicators)) {
+    scaledIndicators[alias] = scaleIndicatorParams(params, timeframe)
+  }
+  return { ...def, indicators: scaledIndicators }
+}
+
+// === Core engine ===
 
 function parseValueRef(ref: ValueRef): {
   indicator?: string
@@ -168,22 +252,45 @@ function computeIndicators(
   return { cache, aliasMap }
 }
 
-export function createCustomStrategy(def: CustomStrategyDef): StrategyFn {
+export function createCustomStrategy(
+  def: CustomStrategyDef,
+  timeframe?: BinanceInterval,
+): StrategyFn {
+  const effectiveDef = timeframe
+    ? scaleStrategyForTimeframe(def, timeframe)
+    : def
+
   return (data: CandleStick[], positionType?: PositionType): Signal | null => {
     if (data.length === 0) return null
 
-    const { cache, aliasMap } = computeIndicators(data, def.indicators)
+    const { cache, aliasMap } = computeIndicators(data, effectiveDef.indicators)
     const candle = data[data.length - 1]
 
-    // Evaluate signals based on current position state to avoid shadowing:
-    // - When holding (positionType='buy'), only sell conditions are actionable
-    // - When flat (positionType='sell'), only buy conditions are actionable
-    // This matches NautilusTrader's if/elif structure where position guards
-    // prevent irrelevant signals from blocking relevant ones.
+    // Position-aware signal evaluation:
+    // - When long (positionType='buy'), only sell conditions are actionable
+    // - When short (positionType='short'), only cover conditions are actionable
+    // - When flat (positionType='sell' or undefined), buy and short conditions are checked
     if (positionType === 'buy') {
-      if (evaluateSignalBlock(def.sell, candle, cache, aliasMap)) return 'sell'
+      if (evaluateSignalBlock(effectiveDef.sell, candle, cache, aliasMap)) {
+        return 'sell'
+      }
+    } else if (positionType === 'short') {
+      if (
+        effectiveDef.cover &&
+        evaluateSignalBlock(effectiveDef.cover, candle, cache, aliasMap)
+      ) {
+        return 'cover'
+      }
     } else {
-      if (evaluateSignalBlock(def.buy, candle, cache, aliasMap)) return 'buy'
+      if (evaluateSignalBlock(effectiveDef.buy, candle, cache, aliasMap)) {
+        return 'buy'
+      }
+      if (
+        effectiveDef.short &&
+        evaluateSignalBlock(effectiveDef.short, candle, cache, aliasMap)
+      ) {
+        return 'short'
+      }
     }
     return null
   }
@@ -216,7 +323,6 @@ function flattenZodIssues(
   for (const issue of issues) {
     const fullPath = [...parentPath, ...(issue.path as (string | number)[])]
     if (issue.code === 'invalid_union' && 'errors' in issue) {
-      // Pick the union branch with the fewest errors (best match)
       const branches = issue.errors as ZodIssue[][]
       let best = branches[0] ?? []
       for (const branch of branches) {
@@ -261,8 +367,20 @@ export function validateStrategy(
   }
 
   // Semantic validation: check value references resolve to declared indicators/fields
-  for (const blockName of ['buy', 'sell'] as const) {
-    const block = def[blockName]
+  const blocksToValidate: { name: string; block: SignalBlock | undefined }[] = [
+    { name: 'buy', block: def.buy },
+    { name: 'sell', block: def.sell },
+    { name: 'short', block: def.short },
+    { name: 'cover', block: def.cover },
+  ]
+
+  // short and cover must both be present or both absent
+  if ((def.short && !def.cover) || (!def.short && def.cover)) {
+    errors.push('Short and cover blocks must both be defined or both absent')
+  }
+
+  for (const { name: blockName, block } of blocksToValidate) {
+    if (!block) continue
     const refs = collectValueRefs(block)
     for (const ref of refs) {
       if (typeof ref === 'number') continue

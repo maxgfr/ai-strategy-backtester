@@ -112,4 +112,48 @@ describe('StrategyDefSchema', () => {
     }
     expect(StrategyDefSchema.safeParse(bad).success).toBe(false)
   })
+
+  it('validates optional short and cover blocks', () => {
+    const withShort = {
+      ...validStrategy,
+      short: { mode: 'all', conditions: [['rsi', '>', 80]] },
+      cover: { mode: 'all', conditions: [['rsi', '<', 40]] },
+    }
+    expect(StrategyDefSchema.safeParse(withShort).success).toBe(true)
+  })
+
+  it('validates without short/cover (backward compatible)', () => {
+    expect(StrategyDefSchema.safeParse(validStrategy).success).toBe(true)
+  })
+
+  it('validates leverage field', () => {
+    const withLeverage = { ...validStrategy, leverage: 3 }
+    expect(StrategyDefSchema.safeParse(withLeverage).success).toBe(true)
+  })
+
+  it('rejects leverage below 1', () => {
+    const bad = { ...validStrategy, leverage: 0.5 }
+    expect(StrategyDefSchema.safeParse(bad).success).toBe(false)
+  })
+
+  it('rejects leverage above 125', () => {
+    const bad = { ...validStrategy, leverage: 200 }
+    expect(StrategyDefSchema.safeParse(bad).success).toBe(false)
+  })
+
+  it('validates short block with score mode', () => {
+    const withScoreShort = {
+      ...validStrategy,
+      short: {
+        mode: 'score',
+        threshold: 2,
+        scored: [
+          ['rsi', '>', 70],
+          ['close', '>', 100],
+        ],
+      },
+      cover: { mode: 'all', conditions: [['rsi', '<', 30]] },
+    }
+    expect(StrategyDefSchema.safeParse(withScoreShort).success).toBe(true)
+  })
 })

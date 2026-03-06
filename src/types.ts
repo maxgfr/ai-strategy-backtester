@@ -7,7 +7,7 @@ export type CandleStick = {
   time: number
 }
 
-export type Position = 'buy' | 'sell'
+export type Position = 'buy' | 'sell' | 'short'
 
 export type LastPosition = {
   date: string
@@ -59,4 +59,12 @@ export type DbSchema = {
   maxDrawdown?: string
   sharpeRatio?: number
   avgTradeProfit?: number
+  // Separate long/short trade metrics
+  longTrades?: number
+  shortTrades?: number
+  longWins?: number
+  shortWins?: number
+  longProfit?: number
+  shortProfit?: number
+  totalFundingPaid?: number
 }

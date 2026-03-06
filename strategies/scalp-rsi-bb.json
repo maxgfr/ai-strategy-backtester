@@ -1,5 +1,5 @@
 {
-  "name": "st-scalp-rsi-bb",
+  "name": "scalp-rsi-bb",
   "description": "BB mean reversion in Supertrend uptrend — buy near lower BB when RSI oversold with volume spike, exit on trend break or upper BB",
   "indicators": {
     "bollingerBands": { "period": 20, "stdDev": 2 },

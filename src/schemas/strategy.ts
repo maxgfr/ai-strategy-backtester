@@ -49,6 +49,7 @@ export const StrategyDefSchema = z.object({
         'Strategy name must be kebab-case (lowercase letters, numbers, hyphens)',
     }),
   description: z.string().min(1),
+  leverage: z.number().min(1).max(125).optional(),
   indicators: z.record(
     z.string().regex(/^[a-zA-Z]+$/, {
       message: 'Indicator alias must contain only letters (no numbers)',
@@ -57,6 +58,8 @@ export const StrategyDefSchema = z.object({
   ),
   buy: SignalBlockSchema,
   sell: SignalBlockSchema,
+  short: SignalBlockSchema.optional(),
+  cover: SignalBlockSchema.optional(),
 })
 
 export type StrategyDefFromSchema = z.infer<typeof StrategyDefSchema>

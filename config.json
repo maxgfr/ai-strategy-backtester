@@ -1,21 +1,134 @@
 {
-  "trading": {
-    "pairs": ["ETHUSDT", "BTCUSDT"],
-    "fees": 0.0026,
-    "initialCapital": 10000
-  },
-  "simulation": {
-    "profiles": {
-      "longTerm": {
-        "periods": ["4h", "6h", "12h"],
-        "strategies": ["*"],
-        "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
-      },
-      "shortTerm": {
-        "periods": ["1h", "2h"],
-        "strategies": ["st-*"],
-        "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }]
-      }
+  "fees": 0.0026,
+  "fundingRate": 0.0001,
+  "initialCapital": 10000,
+  "symbols": ["ETHUSDT", "BTCUSDT", "SOLUSDT"],
+  "dates": [{ "start": "2022-01-01", "end": "2026-02-01" }],
+  "strategies": {
+    "mega-fusion": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "rsi-macd-trend-ride": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.15,
+      "trailing_stop_pct": 0.2
+    },
+    "turtle": {
+      "timeframes": ["2h", "4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "supertrend-pullback-momentum": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "supertrend": {
+      "timeframes": ["6h", "12h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "confluence": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "rsi-macd-buy": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.15,
+      "trailing_stop_pct": 0.2
+    },
+    "pmax": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "breakout-volume": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "stochrsi-trend-filter": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "atr-trailing-vortex": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "kdj-extreme-recovery": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "kdj-ema-scalp": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "bollinger-squeeze": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "ichimoku-cloud": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "chandelier-exit": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "mean-reversion-bb": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "fast-supertrend": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "scalp-rsi-bb": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "vwap-momentum": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "supertrend-flip": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "rsi-reversal": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "macd-crossover": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "bb-mean-reversion": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "vortex-trend": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
     }
   },
   "generation": {

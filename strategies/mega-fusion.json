@@ -1,0 +1,41 @@
+{
+  "name": "mega-fusion",
+  "description": "Multi-indicator fusion — PMAX trend gate + scored confluence of Supertrend, MACD, RSI, StochRSI, ADX, volume, and ATR ratio",
+  "indicators": {
+    "pmax": { "emaPeriod": 10, "atrPeriod": 10, "multiplier": 3 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
+    "rsi": { "period": 14 },
+    "stochRsi": {
+      "rsiPeriod": 14,
+      "stochasticPeriod": 14,
+      "kPeriod": 3,
+      "dPeriod": 3
+    },
+    "adx": { "period": 14 },
+    "volumeSma": { "period": 20 },
+    "atrRatio": { "atrPeriod": 10, "smaPeriod": 50 },
+    "ema": { "period": 50 }
+  },
+  "buy": {
+    "mode": "score",
+    "threshold": 5,
+    "required": [["pmax.pmax", "==", "pmax.pmaxLong"]],
+    "scored": [
+      ["close", ">", "supertrend"],
+      ["adx.adx", ">", 20],
+      ["rsi", ">=", 30],
+      ["rsi", "<=", 70],
+      ["macd.macd", ">", "macd.signal"],
+      ["macd.histogram", ">", 0],
+      ["stochRsi.k", ">", "stochRsi.d"],
+      ["volume", ">", "volumeSma"],
+      ["atrRatio", ">", 0.8],
+      ["close", ">", "ema"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["pmax.pmax", "==", "pmax.pmaxShort"], ["rsi", ">", 80]]
+  }
+}

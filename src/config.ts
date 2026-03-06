@@ -9,22 +9,10 @@ export type DateRange = {
   readonly end: Date
 }
 
-export type SimulationProfile = {
-  readonly name: string
-  readonly periods: BinanceInterval[]
-  readonly strategies: string[]
-  readonly dates: DateRange[]
-}
-
-/**
- * Sliding window of candles passed to strategies each tick.
- * Indicators converge after ~3-5× their longest period (typically 200).
- * 1000 candles = 5× EMA(200), sufficient for all intervals.
- */
-const MAX_ARRAY_SIZE = 1000
-
-export function maxArraySizeForInterval(_interval: BinanceInterval): number {
-  return MAX_ARRAY_SIZE
+export type StrategyConfig = {
+  readonly timeframes: BinanceInterval[]
+  readonly stop_loss_pct?: number
+  readonly trailing_stop_pct?: number
 }
 
 export type GenerationConfig = {
@@ -37,14 +25,12 @@ export type GenerationConfig = {
 }
 
 export type AppConfig = {
-  readonly trading: {
-    readonly pairs: string[]
-    readonly fees: number
-    readonly initialCapital: number
-  }
-  readonly simulation: {
-    readonly profiles: SimulationProfile[]
-  }
+  readonly fees: number
+  readonly fundingRate: number
+  readonly initialCapital: number
+  readonly symbols: string[]
+  readonly dates: DateRange[]
+  readonly strategies: Record<string, StrategyConfig>
   readonly generation: GenerationConfig
   readonly paths: {
     readonly dbFolder: string
@@ -53,33 +39,31 @@ export type AppConfig = {
   }
 }
 
-type RawDateRange = { start: string; end: string }
-
-type RawSimulation = { profiles: Record<string, RawProfile> } | RawProfile
-
-type RawProfile = {
-  periods: BinanceInterval[]
-  strategies: string[]
-  dates: RawDateRange[]
+/**
+ * Sliding window of candles passed to strategies each tick.
+ * Shorter timeframes need more candles for the same wall-clock warmup.
+ */
+const TIMEFRAME_MINUTES: Record<string, number> = {
+  '1m': 1,
+  '3m': 3,
+  '5m': 5,
+  '15m': 15,
+  '30m': 30,
+  '1h': 60,
+  '2h': 120,
+  '4h': 240,
+  '6h': 360,
+  '8h': 480,
+  '12h': 720,
+  '1d': 1440,
+  '3d': 4320,
+  '1w': 10080,
 }
 
-type RawConfig = {
-  trading: {
-    from?: string
-    to?: string
-    pairs?: string[]
-    fees: number
-    initialCapital: number
-  }
-  simulation: RawSimulation
-  generation?: {
-    enabled: boolean
-    model: string
-    baseUrl: string
-    maxTokens: number
-    temperature: number
-  }
-  paths: AppConfig['paths']
+export function maxArraySizeForInterval(interval: BinanceInterval): number {
+  const minutes = TIMEFRAME_MINUTES[interval] ?? 240
+  // 1000 candles for 4h+ (covers 5x EMA(200)), scale up for shorter timeframes
+  return Math.max(1000, Math.round((1000 * 240) / minutes))
 }
 
 function formatZodError(error: ZodError): string {
@@ -95,34 +79,6 @@ function resolveDate(value: string): Date {
   return value === 'now' ? new Date() : new Date(value)
 }
 
-function parseDates(dates: RawDateRange[]): DateRange[] {
-  return dates.map((d) => ({
-    start: resolveDate(d.start),
-    end: resolveDate(d.end),
-  }))
-}
-
-function parseProfiles(raw: RawConfig['simulation']): SimulationProfile[] {
-  if ('profiles' in raw) {
-    return Object.entries(raw.profiles).map(([name, profile]) => ({
-      name,
-      periods: profile.periods,
-      strategies: profile.strategies,
-      dates: parseDates(profile.dates),
-    }))
-  }
-
-  // Backward compat: flat simulation config → single unnamed profile
-  return [
-    {
-      name: 'default',
-      periods: raw.periods,
-      strategies: raw.strategies,
-      dates: parseDates(raw.dates),
-    },
-  ]
-}
-
 export function loadConfig(path?: string): AppConfig {
   const configPath = path ?? resolve(process.cwd(), 'config.json')
   const json = JSON.parse(readFileSync(configPath, 'utf-8'))
@@ -134,9 +90,9 @@ export function loadConfig(path?: string): AppConfig {
     )
   }
 
-  const raw = result.data as RawConfig
+  const raw = result.data
 
-  const defaultGeneration: RawConfig['generation'] = {
+  const defaultGeneration = {
     enabled: false,
     model: 'gpt-4o-mini',
     baseUrl: 'https://api.openai.com/v1',
@@ -144,24 +100,27 @@ export function loadConfig(path?: string): AppConfig {
     temperature: 0.3,
   }
 
-  const pairs = raw.trading.pairs ?? [
-    `${raw.trading.from ?? ''}${raw.trading.to ?? ''}`,
-  ]
-  if (pairs.length === 0 || pairs.some((p) => p.length === 0)) {
-    throw new Error(
-      'Invalid config: trading must have either "pairs" array or "from"/"to" fields',
-    )
+  const dates = raw.dates.map((d) => ({
+    start: resolveDate(d.start),
+    end: resolveDate(d.end),
+  }))
+
+  const strategies: Record<string, StrategyConfig> = {}
+  for (const [name, cfg] of Object.entries(raw.strategies)) {
+    strategies[name] = {
+      timeframes: cfg.timeframes as BinanceInterval[],
+      stop_loss_pct: cfg.stop_loss_pct,
+      trailing_stop_pct: cfg.trailing_stop_pct,
+    }
   }
 
   return {
-    trading: {
-      pairs,
-      fees: raw.trading.fees,
-      initialCapital: raw.trading.initialCapital,
-    },
-    simulation: {
-      profiles: parseProfiles(raw.simulation),
-    },
+    fees: raw.fees,
+    fundingRate: raw.fundingRate ?? 0,
+    initialCapital: raw.initialCapital,
+    symbols: raw.symbols,
+    dates,
+    strategies,
     generation: {
       ...(raw.generation ?? defaultGeneration),
       apiKey: process.env.GENERATION_API_KEY ?? '',

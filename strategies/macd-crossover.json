@@ -1,0 +1,36 @@
+{
+  "name": "macd-crossover",
+  "description": "MACD crossover long/short — long when MACD above signal in uptrend, short when below in downtrend",
+  "leverage": 3,
+  "indicators": {
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
+    "adx": { "period": 14 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["macd.macd", ">", "macd.signal"],
+      ["macd.histogram", ">", 0],
+      ["adx.adx", ">", 20],
+      ["close", ">", "supertrend"]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["macd.macd", "<", "macd.signal"]]
+  },
+  "short": {
+    "mode": "all",
+    "conditions": [
+      ["macd.macd", "<", "macd.signal"],
+      ["macd.histogram", "<", 0],
+      ["adx.adx", ">", 20],
+      ["close", "<", "supertrend"]
+    ]
+  },
+  "cover": {
+    "mode": "any",
+    "conditions": [["macd.macd", ">", "macd.signal"]]
+  }
+}

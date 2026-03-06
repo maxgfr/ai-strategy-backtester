@@ -22,31 +22,11 @@ const DateRangeSchema = z.object({
   end: z.string(),
 })
 
-const ProfileSchema = z.object({
-  maxArraySize: z.number().int().positive().optional(),
-  periods: z.array(BinanceIntervalSchema).nonempty(),
-  strategies: z.array(z.string().min(1)).nonempty(),
-  dates: z.array(DateRangeSchema).nonempty(),
+const StrategyConfigSchema = z.object({
+  timeframes: z.array(BinanceIntervalSchema).nonempty(),
+  stop_loss_pct: z.number().min(0).max(1).optional(),
+  trailing_stop_pct: z.number().min(0).max(1).optional(),
 })
-
-const TradingSchema = z.object({
-  from: z.string().min(1).optional(),
-  to: z.string().min(1).optional(),
-  pairs: z.array(z.string().min(1)).nonempty().optional(),
-  fees: z.number().min(0).max(1),
-  initialCapital: z.number().positive(),
-})
-
-const SimulationWithProfilesSchema = z.object({
-  profiles: z.record(z.string(), ProfileSchema),
-})
-
-const SimulationFlatSchema = ProfileSchema
-
-const SimulationSchema = z.union([
-  SimulationWithProfilesSchema,
-  SimulationFlatSchema,
-])
 
 const GenerationSchema = z.object({
   enabled: z.boolean(),
@@ -63,8 +43,12 @@ const PathsSchema = z.object({
 })
 
 export const RawConfigSchema = z.object({
-  trading: TradingSchema,
-  simulation: SimulationSchema,
+  fees: z.number().min(0).max(1),
+  fundingRate: z.number().min(0).max(0.01).optional(),
+  initialCapital: z.number().positive(),
+  symbols: z.array(z.string().min(1)).nonempty(),
+  dates: z.array(DateRangeSchema).nonempty(),
+  strategies: z.record(z.string(), StrategyConfigSchema),
   generation: GenerationSchema.optional(),
   paths: PathsSchema,
 })

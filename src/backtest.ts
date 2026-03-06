@@ -7,7 +7,7 @@ import type { BinanceInterval } from './types'
 
 // Usage: pnpm backtest [pair] [interval] [startDate] [endDate] [strategy] [--config path]
 // Example: pnpm backtest BTCUSDT 4h 2020-01-09 2021-01-12 pmax
-// Without args: runs the full matrix from config (strategies x periods x dates)
+// Without args: runs the full matrix from config (strategies x timeframes x symbols x dates)
 
 const args = process.argv.slice(2)
 
@@ -24,13 +24,6 @@ if (configFlagIndex !== -1) {
   args.splice(configFlagIndex, 2)
 }
 
-const profileFlagIndex = args.indexOf('--profile')
-let profileFilter: string | undefined
-if (profileFlagIndex !== -1) {
-  profileFilter = args[profileFlagIndex + 1]
-  args.splice(profileFlagIndex, 2)
-}
-
 const [pair, interval, startDateStr, endDateStr, strategy] = args
 
 const params =
@@ -45,7 +38,7 @@ const params =
     : undefined
 
 const totalStart = Date.now()
-const runId = await runSimulation(params, configPath, profileFilter)
+const runId = await runSimulation(params, configPath)
 
 logger.info('Generating report...')
 const reportStart = Date.now()

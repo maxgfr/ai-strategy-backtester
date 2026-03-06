@@ -22,47 +22,20 @@ function buildCatalogDescription(): string {
   return lines.join('\n')
 }
 
-function buildSystemPrompt(shortTerm: boolean): string {
-  const categoryGuidance = shortTerm
-    ? `
-## IMPORTANT: Short-Term Strategy Mode
-
-You are generating a SHORT-TERM strategy for 15m/30m/1h timeframes.
-
-**Naming:** The strategy name MUST start with \`st-\` (e.g., \`st-my-strategy\`).
-
-**Parameter tuning:** Use SHORTER indicator periods for faster signals:
-- RSI: period 7 (not 14)
-- MACD: fast 6, slow 13, signal 5 (not 12/26/9)
-- ADX: period 10 (not 14)
-- Supertrend: atrPeriod 5, multiplier 2 (not 10/3)
-- Bollinger Bands: period 12 (not 20)
-- Keltner: maPeriod 10 (not 20)
-- volumeSma: period 10 (not 20)
-- CMF: period 10 (not 20)
-- MFI: period 7 (not 14)
-- ROC: period 5 (not 12)
-- StochRSI: rsiPeriod 7, stochasticPeriod 7 (not 14/14)
-- KDJ: rsvPeriod 5, kPeriod 2, dPeriod 2 (not 9/3/3)
-- PSAR: step 0.03, max 0.25 (not 0.02/0.2)
-- Donchian: period 10-20 (not 50-200)
-- EMA: period 5-13 (not 20-50)
-
-**Style:** Focus on scalping, mean reversion, quick momentum catches. Use volume confirmation (volumeSma with period 10).
-`
-    : `
-## Long-Term Strategy Mode
-
-You are generating a LONG-TERM strategy for 4h/6h/8h timeframes.
-
-**Naming:** Use standard kebab-case name (no \`st-\` prefix).
-
-**Parameters:** Use standard indicator defaults. Focus on trend following, breakouts, swing reversals.
-`
-
+function buildSystemPrompt(): string {
   return `You are a trading strategy generator. You produce JSON strategy definitions for a crypto backtester.
 
-${categoryGuidance}
+## Strategy Mode
+
+You are generating a strategy that automatically adapts its indicator periods based on the timeframe it runs on.
+The backtester will auto-scale periods: shorter timeframes get larger periods, longer timeframes get smaller periods.
+Define all indicator periods for a 4h reference timeframe — the engine handles the rest.
+
+**Naming:** Use standard kebab-case name (e.g., "my-strategy"). No prefixes needed.
+
+**Parameters:** Use standard indicator defaults for 4h reference. Focus on trend following, breakouts, swing reversals, or mean reversion.
+
+**Shorting:** You can optionally add "short" and "cover" signal blocks (both must be present or both absent). Add a "leverage" field (1-125) for shorting strategies.
 
 ## Output Schema
 
@@ -70,20 +43,23 @@ ${categoryGuidance}
 {
   "name": "kebab-case-name",
   "description": "Short description of the strategy",
+  "leverage": 1,
   "indicators": {
     "indicatorName": { "param1": value, "param2": value }
   },
   "buy": {
     "mode": "all" | "any" | "score",
     "conditions": [["valueRef", "op", "valueRef"], ...],
-    "threshold": number,       // only for mode "score"
-    "required": [...],         // only for mode "score", optional
-    "scored": [...]            // only for mode "score" (NOT "conditions")
+    "threshold": number,
+    "required": [...],
+    "scored": [...]
   },
   "sell": {
     "mode": "all" | "any" | "score",
     "conditions": [["valueRef", "op", "valueRef"], ...]
-  }
+  },
+  "short": { ... },
+  "cover": { ... }
 }
 \`\`\`
 
@@ -118,11 +94,12 @@ ${buildCatalogDescription()}
 
 1. Only use indicators from the catalog above
 2. Only reference fields that exist for each indicator
-3. Use kebab-case for the strategy name${shortTerm ? '\n4. Name MUST start with `st-`' : ''}
+3. Use kebab-case for the strategy name
 4. Output ONLY the JSON object, no explanation
 5. Every indicator referenced in conditions MUST be declared in "indicators"
 6. Alias names: letters only [a-zA-Z]+ (no numbers)
 7. Score mode: use \`scored\` array, not \`conditions\`
+8. Both short and cover must be present together or both absent
 
 ## Anti-Patterns (AVOID)
 
@@ -155,10 +132,7 @@ ${buildCatalogDescription()}
 `
 }
 
-async function generateStrategy(
-  description: string,
-  shortTerm: boolean,
-): Promise<void> {
+async function generateStrategy(description: string): Promise<void> {
   const config = loadConfig()
 
   if (!config.generation.enabled) {
@@ -173,8 +147,7 @@ async function generateStrategy(
     process.exit(1)
   }
 
-  const category = shortTerm ? 'short-term' : 'long-term'
-  logger.info(`Generating ${category} strategy from: "${description}"`)
+  logger.info(`Generating strategy from: "${description}"`)
 
   const response = await fetch(
     `${config.generation.baseUrl}/chat/completions`,
@@ -187,7 +160,7 @@ async function generateStrategy(
       body: JSON.stringify({
         model: config.generation.model,
         messages: [
-          { role: 'system', content: buildSystemPrompt(shortTerm) },
+          { role: 'system', content: buildSystemPrompt() },
           { role: 'user', content: description },
         ],
         max_tokens: config.generation.maxTokens,
@@ -222,14 +195,6 @@ async function generateStrategy(
     process.exit(1)
   }
 
-  // Validate st- prefix for short-term strategies
-  if (shortTerm && !def.name.startsWith('st-')) {
-    logger.warn(
-      `Short-term strategy name "${def.name}" missing st- prefix, adding it`,
-    )
-    def = { ...def, name: `st-${def.name}` }
-  }
-
   const { valid, errors } = validateStrategy(def)
   if (!valid) {
     logger.error(`Generated strategy is invalid:\n  - ${errors.join('\n  - ')}`)
@@ -241,33 +206,20 @@ async function generateStrategy(
   writeFileSync(outPath, JSON.stringify(def, null, 2), 'utf-8')
   logger.info(`Strategy saved to ${outPath}`)
   logger.info(`Name: ${def.name}`)
-  logger.info(`Category: ${category}`)
   logger.info(`Description: ${def.description}`)
   logger.info(`Indicators: ${Object.keys(def.indicators).join(', ')}`)
-
-  const exampleInterval = shortTerm ? '1h' : '4h'
-  const exampleDates = shortTerm
-    ? '2025-06-01 2026-02-01'
-    : '2024-01-01 2025-01-01'
   logger.info(
-    `To backtest: pnpm backtest ETHUSDT ${exampleInterval} ${exampleDates} ${def.name}`,
+    `To backtest: pnpm backtest ETHUSDT 4h 2024-01-01 2025-01-01 ${def.name}`,
   )
 }
 
 const args = process.argv.slice(2)
-
-const shortTermIndex = args.indexOf('--short-term')
-const shortTerm = shortTermIndex !== -1
-if (shortTermIndex !== -1) {
-  args.splice(shortTermIndex, 1)
-}
-
 const description = args.join(' ')
 if (!description) {
   logger.error(
-    'Usage: pnpm generate-strategy [--short-term] "Buy when RSI < 30 and MACD histogram > 0"',
+    'Usage: pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"',
   )
   process.exit(1)
 }
 
-generateStrategy(description, shortTerm)
+generateStrategy(description)

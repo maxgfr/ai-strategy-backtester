@@ -1,0 +1,24 @@
+{
+  "name": "chandelier-exit",
+  "description": "Chandelier exit trend following — buy when price above long exit with ADX trending, sell on chandelier short exit",
+  "indicators": {
+    "chandelier": { "period": 22, "multiplier": 3 },
+    "adx": { "period": 14 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "chandelier.exitLong"],
+      ["adx.adx", ">", 20],
+      ["macd.histogram", ">", 0]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      ["close", "<", "chandelier.exitShort"],
+      ["macd.histogram", "<", 0]
+    ]
+  }
+}

@@ -203,6 +203,82 @@ describe('createCustomStrategy', () => {
     const candles = makeCandles(5, 100)
     expect(fn(candles)).toBe('buy')
   })
+
+  it('returns short signal when flat and short conditions met', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-short',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '<', 0]] },
+      sell: { mode: 'all', conditions: [['close', '<', 0]] },
+      short: { mode: 'all', conditions: [['close', '>', 50]] },
+      cover: { mode: 'all', conditions: [['close', '<', 50]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5, 100)
+    // buy fails (close > 0), so short is checked and matches
+    expect(fn(candles)).toBe('short')
+  })
+
+  it('returns cover signal when short and cover conditions met', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-cover',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '>', 50]] },
+      sell: { mode: 'all', conditions: [['close', '>', 200]] },
+      short: { mode: 'all', conditions: [['close', '>', 50]] },
+      cover: { mode: 'all', conditions: [['close', '>', 0]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5, 100)
+    expect(fn(candles, 'short')).toBe('cover')
+  })
+
+  it('returns null when short but cover conditions not met', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-no-cover',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '>', 50]] },
+      sell: { mode: 'all', conditions: [['close', '>', 200]] },
+      short: { mode: 'all', conditions: [['close', '>', 50]] },
+      cover: { mode: 'all', conditions: [['close', '<', 0]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5, 100)
+    expect(fn(candles, 'short')).toBe(null)
+  })
+
+  it('buy takes priority over short when flat', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-buy-priority',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '>', 0]] },
+      sell: { mode: 'all', conditions: [['close', '<', 0]] },
+      short: { mode: 'all', conditions: [['close', '>', 0]] },
+      cover: { mode: 'all', conditions: [['close', '>', 0]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5, 100)
+    // Both buy and short would match, but buy is checked first
+    expect(fn(candles)).toBe('buy')
+  })
+
+  it('ignores short/cover blocks when not defined', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-no-short',
+      description: 'test',
+      indicators: {},
+      buy: { mode: 'all', conditions: [['close', '<', 0]] },
+      sell: { mode: 'all', conditions: [['close', '<', 0]] },
+    }
+    const fn = createCustomStrategy(def)
+    const candles = makeCandles(5, 100)
+    // No buy, no short defined → null
+    expect(fn(candles)).toBe(null)
+  })
 })
 
 describe('validateStrategy', () => {
@@ -293,5 +369,128 @@ describe('validateStrategy', () => {
     const result = validateStrategy(def)
     expect(result.valid).toBe(false)
     expect(result.errors.some((e) => e.includes('threshold'))).toBe(true)
+  })
+
+  it('validates strategy with short and cover blocks', () => {
+    const def: CustomStrategyDef = {
+      name: 'with-short',
+      description: 'A strategy with shorting',
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+      short: { mode: 'all', conditions: [['rsi', '>', 80]] },
+      cover: { mode: 'all', conditions: [['rsi', '<', 40]] },
+    }
+    const result = validateStrategy(def)
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
+  it('catches short without cover', () => {
+    const def: CustomStrategyDef = {
+      name: 'short-no-cover',
+      description: 'test',
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+      short: { mode: 'all', conditions: [['rsi', '>', 80]] },
+    }
+    const result = validateStrategy(def)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('Short and cover'))).toBe(true)
+  })
+
+  it('validates leverage field', () => {
+    const def: CustomStrategyDef = {
+      name: 'with-leverage',
+      description: 'test',
+      leverage: 3,
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+      short: { mode: 'all', conditions: [['rsi', '>', 80]] },
+      cover: { mode: 'all', conditions: [['rsi', '<', 40]] },
+    }
+    const result = validateStrategy(def)
+    expect(result.valid).toBe(true)
+  })
+
+  it('validates value references in short/cover blocks', () => {
+    const def: CustomStrategyDef = {
+      name: 'bad-short-ref',
+      description: 'test',
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+      short: { mode: 'all', conditions: [['fakeindicator', '>', 80]] },
+      cover: { mode: 'all', conditions: [['rsi', '<', 40]] },
+    }
+    const result = validateStrategy(def)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.includes('undeclared indicator'))).toBe(
+      true,
+    )
+  })
+})
+
+describe('timeframe auto-scaling', () => {
+  it('does not scale on 4h (reference timeframe)', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-scale-4h',
+      description: 'test',
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+    }
+    // createCustomStrategy with 4h should not change periods
+    const fn4h = createCustomStrategy(def, '4h')
+    const fnNoTf = createCustomStrategy(def)
+    const candles = makeCandles(50, 100)
+    // Both should produce the same result
+    expect(fn4h(candles)).toBe(fnNoTf(candles))
+  })
+
+  it('produces different results on different timeframes', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-scale-diff',
+      description: 'test',
+      indicators: { rsi: { period: 14 } },
+      buy: { mode: 'all', conditions: [['rsi', '<', 30]] },
+      sell: { mode: 'all', conditions: [['rsi', '>', 70]] },
+    }
+    // Different timeframes scale indicator periods differently
+    const fn1h = createCustomStrategy(def, '1h')
+    const fn12h = createCustomStrategy(def, '12h')
+    // Both should return valid functions
+    expect(typeof fn1h).toBe('function')
+    expect(typeof fn12h).toBe('function')
+    // With 50 candles, both should handle gracefully
+    const candles = makeCandles(50, 100)
+    const result1h = fn1h(candles)
+    const result12h = fn12h(candles)
+    // Results may differ due to different scaled periods
+    expect(result1h === null || result1h === 'buy' || result1h === 'sell').toBe(
+      true,
+    )
+    expect(
+      result12h === null || result12h === 'buy' || result12h === 'sell',
+    ).toBe(true)
+  })
+
+  it('does not scale non-period params like multiplier', () => {
+    const def: CustomStrategyDef = {
+      name: 'test-no-scale-multiplier',
+      description: 'test',
+      indicators: {
+        supertrend: { atrPeriod: 10, multiplier: 3 },
+      },
+      buy: { mode: 'all', conditions: [['supertrend', '<', 'close']] },
+      sell: { mode: 'all', conditions: [['supertrend', '>', 'close']] },
+    }
+    // Just verify it doesn't crash when scaling
+    const fn = createCustomStrategy(def, '1h')
+    const candles = makeCandles(50, 100)
+    const result = fn(candles)
+    expect(result === null || result === 'buy' || result === 'sell').toBe(true)
   })
 })

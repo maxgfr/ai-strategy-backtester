@@ -1,0 +1,32 @@
+{
+  "name": "vortex-trend",
+  "description": "Vortex indicator trend — long when VI+ > VI-, short when VI- > VI+, with ADX trend filter",
+  "leverage": 2,
+  "indicators": {
+    "vortex": { "period": 14 },
+    "adx": { "period": 14 },
+    "atrTrailingStop": { "period": 14, "multiplier": 3 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["vortex.plusVI", ">", "vortex.minusVI"],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["close", "<", "atrTrailingStop.stop"]]
+  },
+  "short": {
+    "mode": "all",
+    "conditions": [
+      ["vortex.minusVI", ">", "vortex.plusVI"],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "cover": {
+    "mode": "any",
+    "conditions": [["close", ">", "atrTrailingStop.stop"]]
+  }
+}
