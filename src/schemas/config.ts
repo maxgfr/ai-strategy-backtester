@@ -45,6 +45,7 @@ const PathsSchema = z.object({
 export const RawConfigSchema = z.object({
   fees: z.number().min(0).max(1),
   fundingRate: z.number().min(0).max(0.01).optional(),
+  slippage: z.number().min(0).max(0.1).optional(),
   initialCapital: z.number().positive(),
   symbols: z.array(z.string().min(1)).nonempty(),
   dates: z.array(DateRangeSchema).nonempty(),

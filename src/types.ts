@@ -67,4 +67,13 @@ export type DbSchema = {
   longProfit?: number
   shortProfit?: number
   totalFundingPaid?: number
+  // Advanced risk metrics
+  sortino?: number
+  calmarRatio?: number
+  recoveryFactor?: number
+  avgWin?: number
+  avgLoss?: number
+  maxConsecutiveWins?: number
+  maxConsecutiveLosses?: number
+  expectancy?: number
 }

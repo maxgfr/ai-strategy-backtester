@@ -15,7 +15,7 @@
       ["vortex.plusVI[-1]", "<", "vortex.minusVI[-1]"],
       ["adx.adx", ">", 20],
       ["macd.histogram", ">", 0],
-      ["rsi", "<", 68]
+      ["rsi", "<", 55]
     ]
   },
   "sell": {

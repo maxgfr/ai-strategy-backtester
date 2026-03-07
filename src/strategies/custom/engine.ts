@@ -63,6 +63,15 @@ const PERIOD_PARAMS = new Set([
   'signalPeriod',
   'smooth1Period',
   'smooth2Period',
+  'shortPeriod',
+  'longPeriod',
+  'period1',
+  'period2',
+  'period3',
+  'rocPeriod1',
+  'rocPeriod2',
+  'wmaPeriod',
+  'sumPeriod',
 ])
 
 function scaleIndicatorParams(

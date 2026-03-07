@@ -27,6 +27,7 @@ export type GenerationConfig = {
 export type AppConfig = {
   readonly fees: number
   readonly fundingRate: number
+  readonly slippage: number
   readonly initialCapital: number
   readonly symbols: string[]
   readonly dates: DateRange[]
@@ -117,6 +118,7 @@ export function loadConfig(path?: string): AppConfig {
   return {
     fees: raw.fees,
     fundingRate: raw.fundingRate ?? 0,
+    slippage: raw.slippage ?? 0,
     initialCapital: raw.initialCapital,
     symbols: raw.symbols,
     dates,

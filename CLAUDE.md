@@ -2,7 +2,12 @@
 
 ## Maintenance Rule (CRITICAL)
 
-**After every iteration that modifies code, verify that this CLAUDE.md is still accurate.** If files were added/removed, strategies changed, config modified, commands updated, or architecture altered — update this file immediately. An outdated CLAUDE.md causes compounding errors across sessions.
+**After every iteration that modifies code, verify that these files are still accurate:**
+1. **`CLAUDE.md`** — architecture, strategy list, indicator count, config fields
+2. **`README.md`** — strategy list, indicator count, feature descriptions
+3. **`STRATEGY_PROMPT.md`** — indicator tables, threshold reference, examples
+
+If files were added/removed, strategies changed, indicators added, config modified, commands updated, or architecture altered — update ALL THREE files immediately. An outdated doc causes compounding errors across sessions.
 
 ---
 
@@ -24,23 +29,27 @@ strategies/                          # ALL strategies as JSON (no TS strategies,
 ├── supertrend-pullback-momentum.json # Supertrend dip buyer
 ├── supertrend.json                  # ATR-based trend following
 ├── confluence.json                  # Multi-indicator scoring (PMAX + score mode)
-├── rsi-macd-buy.json                # RSI oversold + MACD histogram
-├── kdj-ema-scalp.json              # KDJ + EMA crossover scalp
+├── kdj-ema-scalp.json              # KDJ + Supertrend scalp
 ├── bollinger-squeeze.json           # BB squeeze breakout + MACD + ADX
 ├── ichimoku-cloud.json              # Ichimoku cloud trend following
 ├── chandelier-exit.json             # Chandelier exit + ADX trend filter
-├── mean-reversion-bb.json           # BB lower band + RSI mean reversion
 ├── pmax.json                        # PMAX trend following
 ├── breakout-volume.json             # Donchian breakout + volume
 ├── stochrsi-trend-filter.json       # StochRSI + Supertrend + ADX
 ├── atr-trailing-vortex.json         # Vortex + ATR trailing stop
 ├── kdj-extreme-recovery.json        # KDJ J-line recovery
-├── fast-supertrend.json             # Fast Supertrend + MACD
+├── fast-supertrend.json             # Fast Supertrend + RSI + ADX
 ├── scalp-rsi-bb.json                # BB mean reversion + RSI + volume
 ├── vwap-momentum.json               # VWAP-gated momentum
+├── cci-williams-momentum.json       # CCI zero-cross + Williams %R + Supertrend
+├── hull-chop-momentum.json          # HMA + Choppiness filter + Ultimate Oscillator dip
+├── fisher-pullback.json             # Fisher Transform + RSI + HMA trend pullback
+├── force-trend.json                 # Force Index + ADX + Linear Regression Slope
+├── vwma-chop-breakout.json          # VWMA/SMA divergence + Choppiness breakout
+├── coppock-bottom.json              # Coppock Curve + McGinley Dynamic bottom picker
 ├── supertrend-flip.json             # Long/short Supertrend flip (2x leverage)
 ├── rsi-reversal.json                # RSI mean reversion long/short (2x)
-├── macd-crossover.json              # MACD crossover long/short (3x)
+├── macd-crossover.json              # MACD crossover long/short (2x)
 ├── bb-mean-reversion.json           # BB long lower / short upper (2x)
 └── vortex-trend.json                # Vortex VI+/VI- trend (2x)
 src/
@@ -62,7 +71,7 @@ src/
 │   ├── types.ts            # StrategyFn, Signal, StrategyName types
 │   └── custom/             # Declarative JSON strategy engine
 │       ├── types.ts        # Schema types (CustomStrategyDef, SignalBlock, Condition)
-│       ├── catalog.ts      # Indicator name → wrapper fn + metadata (35 indicators)
+│       ├── catalog.ts      # Indicator name → wrapper fn + metadata (51 indicators)
 │       ├── engine.ts       # JSON → StrategyFn interpreter + validator + timeframe auto-scaling
 │       └── loader.ts       # Discover & load JSON files from strategies/
 ├── schemas/                # Zod validation schemas
@@ -131,6 +140,7 @@ All configuration is externalized in `config.json` at the project root. Loaded b
 |---|---|---|
 | `fees` | `0.0026` | Trading fees (0.26%) |
 | `fundingRate` | `0.0001` | Funding rate for perpetual futures (applied every 8h during open positions) |
+| `slippage` | `0.001` | Slippage per trade (0.1%). Buy/cover execute at `price*(1+slippage)`, sell/short at `price*(1-slippage)` |
 | `initialCapital` | `10000` | Starting capital |
 | `symbols` | `["ETHUSDT", "BTCUSDT", "SOLUSDT"]` | Trading pairs — simulation runs matrix across all |
 | `dates` | `[{"start": "2022-01-01", "end": "2026-02-01"}]` | Date ranges for backtesting |
@@ -183,23 +193,27 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend dip buyer + RSI pullback + MACD + ADX |
 | **Supertrend** | `supertrend.json` | ATR-based trend-following |
 | **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume) |
-| **RSI-MACD Buy** | `rsi-macd-buy.json` | RSI oversold + MACD histogram positive, RSI > 70 exit |
-| **KDJ EMA Scalp** | `kdj-ema-scalp.json` | KDJ + EMA crossover scalp |
+| **KDJ EMA Scalp** | `kdj-ema-scalp.json` | KDJ + Supertrend scalp |
 | **Bollinger Squeeze** | `bollinger-squeeze.json` | BB squeeze breakout + MACD + ADX |
 | **Ichimoku Cloud** | `ichimoku-cloud.json` | Ichimoku cloud trend following |
 | **Chandelier Exit** | `chandelier-exit.json` | Chandelier exit + ADX trend filter |
-| **Mean Reversion BB** | `mean-reversion-bb.json` | BB lower band + RSI mean reversion |
 | **PMAX** | `pmax.json` | EMA + ATR-based Supertrend trend following |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX + volume confirmation |
 | **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover in Supertrend uptrend + ADX |
 | **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex crossover + ATR trailing stop + ADX + MACD |
 | **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery in Supertrend uptrend |
-| **Fast Supertrend** | `fast-supertrend.json` | Fast Supertrend + MACD + ADX |
+| **Fast Supertrend** | `fast-supertrend.json` | Fast Supertrend + RSI + ADX |
 | **Scalp RSI BB** | `scalp-rsi-bb.json` | BB mean reversion + RSI oversold + volume |
 | **VWAP Momentum** | `vwap-momentum.json` | VWAP-gated score mode momentum |
 | **Supertrend Flip** | `supertrend-flip.json` | Long/short Supertrend flip (2x leverage) |
 | **RSI Reversal** | `rsi-reversal.json` | RSI mean reversion long/short (2x) |
-| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (3x) |
+| **CCI Williams Momentum** | `cci-williams-momentum.json` | CCI zero-cross + Williams %R oversold + Supertrend |
+| **Hull Chop Momentum** | `hull-chop-momentum.json` | HMA trend + Choppiness filter + UO oversold dip |
+| **Fisher Pullback** | `fisher-pullback.json` | Fisher Transform + RSI + HMA trend pullback |
+| **Force Trend** | `force-trend.json` | Force Index zero-cross + ADX + Linear Regression Slope |
+| **VWMA Chop Breakout** | `vwma-chop-breakout.json` | VWMA/SMA divergence + Choppiness breakout |
+| **Coppock Bottom** | `coppock-bottom.json` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
+| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (2x) |
 | **BB Mean Reversion** | `bb-mean-reversion.json` | BB long lower / short upper (2x) |
 | **Vortex Trend** | `vortex-trend.json` | Vortex VI+/VI- trend long/short (2x) |
 
@@ -230,13 +244,13 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 
 **`_type` aliasing:** Use `{"_type": "donchian", "period": 200}` to create multiple instances of the same indicator under different aliases (e.g., turtle uses `"breakout"` and `"exit"` both backed by donchian).
 
-**35 indicators available** in the catalog (`src/strategies/custom/catalog.ts`): rsi, ema, supertrend, bollingerBands, obv, vwap, cmf, williamsR, cci, roc, ad, mfi, psar, ao, movingAverage, trix, volumeOscillator, macd, pmax, adx, donchian, stochastic, aroon, ichimoku, vortex, chandelier, keltner, starcBands, movingAverageEnvelope, atrTrailingStop, pmo, kdj, stochRsi, volumeSma, atrRatio.
+**51 indicators available** in the catalog (`src/strategies/custom/catalog.ts`): rsi, ema, supertrend, bollingerBands, obv, vwap, cmf, williamsR, cci, roc, ad, mfi, psar, ao, movingAverage, trix, volumeOscillator, macd, pmax, adx, donchian, stochastic, aroon, ichimoku, vortex, chandelier, keltner, starcBands, movingAverageEnvelope, atrTrailingStop, pmo, kdj, stochRsi, volumeSma, atrRatio, elderRay, ravi, hma, choppinessIndex, ultimateOscillator, chaikinOscillator, linearRegressionSlope, fisherTransform, coppockCurve, forceIndex, dpo, vwma, rvi, massIndex, emv, mcginleyDynamic.
 
 **Timeframe auto-scaling:** Indicator periods automatically scale based on the running timeframe relative to the 4h reference. Uses sqrt dampening: `scale = sqrt(240 / tfMinutes)`. Only period-like params (period, fast, slow, signal, etc.) are scaled; multiplier/stdDev stay fixed. Minimum period is 2.
 
 **AI generation:** `pnpm generate-strategy "Buy when RSI < 30 and MACD histogram > 0"` — generates a strategy. Indicator periods should be tuned for 4h (the reference timeframe); auto-scaling handles other timeframes.
 
-**Manual generation:** When the user asks to create or generate a strategy (without using `pnpm generate-strategy`), follow the spec in `STRATEGY_PROMPT.md` at the project root. It contains the full JSON schema, all 35 indicators with parameters and fields, value reference syntax, and examples. Write the JSON file directly to `strategies/` — it will be auto-discovered on the next backtest.
+**Manual generation:** When the user asks to create or generate a strategy (without using `pnpm generate-strategy`), follow the spec in `STRATEGY_PROMPT.md` at the project root. It contains the full JSON schema, all 51 indicators with parameters and fields, value reference syntax, and examples. Write the JSON file directly to `strategies/` — it will be auto-discovered on the next backtest.
 
 ---
 
@@ -247,12 +261,13 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 - Each worker receives `maxArraySize` computed dynamically from interval, plus per-strategy `stop_loss_pct` and `trailing_stop_pct`
 - Each run creates `db/{runId}/` with results as `{pair}_{interval}_{strategy}_{start}_{end}.json`
 - `runId` is an auto-generated timestamp (`YYYYMMDD_HHmmss`) — concurrent runs never collide
-- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, separate long/short trade metrics
+- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, slippage, separate long/short trade metrics
 - Report generated as `reports/report_<timestamp>.html` (unique per run, no overwrite) with:
   - **Category comparison cards** (best Long-Only vs best Shorting side by side)
   - **Filter buttons** (All / Long-Only / Shorting) to toggle rankings and averages tables
   - **Category badges**: Long-Only (green), Shorting (purple)
   - Classification is data-driven: `shortTrades > 0` = Shorting, else Long-Only
+  - **Equity curve** (gold line) overlaid on chart modal
   - Chart markers: purple arrows for SHORT entries, labels distinguish SELL vs COVER on exits
 
 ---
@@ -268,9 +283,10 @@ type ResolvedStrategy = { fn: StrategyFn, leverage: number }  // returned by get
 type CandleStick = { open, high, close, low, volume, time }
 type LastPosition = { date, type, price, capital, assets, tradeProfit? }
 type DbSchema = { version, initialParameters, historicPosition, position, ...metrics,
-                  longTrades?, shortTrades?, longWins?, shortWins?, longProfit?, shortProfit?, totalFundingPaid? }
+                  longTrades?, shortTrades?, longWins?, shortWins?, longProfit?, shortProfit?, totalFundingPaid?,
+                  sortino?, calmarRatio?, recoveryFactor?, avgWin?, avgLoss?, maxConsecutiveWins?, maxConsecutiveLosses?, expectancy? }
 type StrategyConfig = { timeframes, stop_loss_pct?, trailing_stop_pct? }  // in config.ts
-type AppConfig = { fees, fundingRate, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, paths }
+type AppConfig = { fees, fundingRate, slippage, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, paths }
 ```
 
 ---
@@ -379,6 +395,11 @@ indicatorName(candles, period) // → number[] or object[]
 | **Vortex** | `vortex.ts` | `period=14` |
 | **Heikin Ashi** | `heikinAshi.ts` | (none) |
 | **PSAR** | `psar.ts` | `step=0.02`, `max=0.2` |
+| **HMA** | `hma.ts` | `period=16` |
+| **Linear Regression Slope** | `linearRegressionSlope.ts` | `period=14` |
+| **McGinley Dynamic** | `mcginleyDynamic.ts` | `period=14` |
+| **Coppock Curve** | `coppockCurve.ts` | `rocPeriod1=14`, `rocPeriod2=11`, `wmaPeriod=10` |
+| **DPO** | `dpo.ts` | `period=20` |
 
 ### Momentum / Oscillators
 
@@ -396,6 +417,9 @@ indicatorName(candles, period) // → number[] or object[]
 | **PMO** | `pmo.ts` | `period` |
 | **Pring Special K** | `pringSpecialK.ts` | (internal periods) |
 | **RAVI** | `ravi.ts` | `fastPeriod=7`, `slowPeriod=65` |
+| **Ultimate Oscillator** | `ultimateOscillator.ts` | `period1=7`, `period2=14`, `period3=28` |
+| **Fisher Transform** | `fisherTransform.ts` | `period=10` → {fisher, signal} |
+| **RVI** | `rvi.ts` | `period=10` → {rvi, signal} |
 
 ### Volatility / Bands
 
@@ -409,6 +433,8 @@ indicatorName(candles, period) // → number[] or object[]
 | **Chandelier** | `chandelier.ts` | `period=22`, `multiplier=3` |
 | **ATR Trailing Stop** | `atrTrailingStop.ts` | `period=14`, `multiplier=3` |
 | **MA Envelope** | `movingAverageEnvelope.ts` | `period=20`, `percentage=2.5` |
+| **Choppiness Index** | `choppinessIndex.ts` | `period=14` |
+| **Mass Index** | `massIndex.ts` | `emaPeriod=9`, `sumPeriod=25` |
 
 ### Volume Indicators
 
@@ -420,6 +446,10 @@ indicatorName(candles, period) // → number[] or object[]
 | **AD** | `ad.ts` | (none) |
 | **VWAP** | `vwap.ts` | (none) |
 | **Volume Oscillator** | `volumeOscillator.ts` | `fastPeriod=5`, `slowPeriod=10` |
+| **Chaikin Oscillator** | `chaikinOscillator.ts` | `fastPeriod=3`, `slowPeriod=10` |
+| **Force Index** | `forceIndex.ts` | `period=13` |
+| **EMV** | `emv.ts` | `period=14` |
+| **VWMA** | `vwma.ts` | `period=20` |
 
 ### Catalog-Only (Composite Indicators)
 

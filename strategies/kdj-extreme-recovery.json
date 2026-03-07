@@ -20,7 +20,7 @@
     "mode": "any",
     "conditions": [
       ["close", "<", "supertrend"],
-      ["kdj.j", ">", 90],
+      ["kdj.j", ">", 100],
       ["rsi", ">", 78]
     ]
   }

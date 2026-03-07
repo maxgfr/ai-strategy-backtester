@@ -1,0 +1,24 @@
+{
+  "name": "fisher-pullback",
+  "description": "Fisher Transform reversal + RSI oversold confirmation in HMA uptrend — catches precise turning points in trending markets",
+  "indicators": {
+    "fisherTransform": { "period": 10 },
+    "rsi": { "period": 14 },
+    "hma": { "period": 16 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "hma"],
+      ["fisherTransform.fisher", ">", "fisherTransform.signal"],
+      ["rsi", "<", 40]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      ["fisherTransform.fisher", "<", "fisherTransform.signal"],
+      ["rsi", ">", 75]
+    ]
+  }
+}

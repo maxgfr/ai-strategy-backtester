@@ -18,6 +18,11 @@ export type SimulationResult = {
     maxDrawdown?: string
     sharpeRatio?: number
     avgTradeProfit?: number
+    sortino?: number
+    recoveryFactor?: number
+    expectancy?: number
+    avgWin?: number
+    avgLoss?: number
     historicPosition?: LastPosition[]
   }
   category: 'Long-Only' | 'Shorting'
@@ -34,6 +39,8 @@ type StrategyAverage = {
   avgWinRate: number
   avgSharpe: number
   avgMaxDrawdown: number
+  avgSortino: number
+  avgExpectancy: number
 }
 
 function parsePercent(value: string | undefined): number {
@@ -73,6 +80,10 @@ function computeStrategyAverages(
       group.reduce((s, r) => s + (r.data.sharpeRatio ?? 0), 0) / count
     const avgMaxDrawdown =
       group.reduce((s, r) => s + parsePercent(r.data.maxDrawdown), 0) / count
+    const avgSortino =
+      group.reduce((s, r) => s + (r.data.sortino ?? 0), 0) / count
+    const avgExpectancy =
+      group.reduce((s, r) => s + (r.data.expectancy ?? 0), 0) / count
 
     averages.push({
       strategy,
@@ -85,6 +96,8 @@ function computeStrategyAverages(
       avgWinRate: round(avgWinRate),
       avgSharpe: round(avgSharpe),
       avgMaxDrawdown: round(avgMaxDrawdown),
+      avgSortino: round(avgSortino),
+      avgExpectancy: round(avgExpectancy),
     })
   }
 
@@ -125,6 +138,9 @@ function buildBestCard(
           <div class="best-item"><span class="label">Sharpe Ratio</span><span class="value">${best.data.sharpeRatio ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Trades</span><span class="value">${best.data.nbPosition ?? 0}</span></div>
           <div class="best-item"><span class="label">Avg Trade Profit</span><span class="value ${colorClass(best.data.avgTradeProfit ?? 0)}">$${best.data.avgTradeProfit ?? 0}</span></div>
+          <div class="best-item"><span class="label">Sortino</span><span class="value">${best.data.sortino ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Recovery Factor</span><span class="value">${best.data.recoveryFactor ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Expectancy</span><span class="value ${colorClass(best.data.expectancy ?? 0)}">$${best.data.expectancy ?? 0}</span></div>
         </div>
       </div>`
 }
@@ -345,6 +361,32 @@ function buildChartScript(
         candleSeries.setMarkers(markers);
       }
 
+      // Equity curve line (capital at each trade close)
+      if (trades && trades.length > 0) {
+        var equityData = [];
+        for (var j = 0; j < trades.length; j++) {
+          var t = trades[j];
+          if (t.capital != null) {
+            var eqTime = Math.floor(new Date(t.date).getTime() / 1000);
+            var eqClosest = findClosestTime(candleTimes, eqTime);
+            equityData.push({ time: eqClosest, value: t.capital });
+          }
+        }
+        if (equityData.length > 0) {
+          var equitySeries = chart.addLineSeries({
+            color: '#e8a838',
+            lineWidth: 2,
+            priceScaleId: 'equity',
+            lastValueVisible: true,
+            priceLineVisible: false,
+          });
+          chart.priceScale('equity').applyOptions({
+            scaleMargins: { top: 0.05, bottom: 0.4 },
+          });
+          equitySeries.setData(equityData);
+        }
+      }
+
       chart.timeScale().fitContent();
 
       resizeHandler = function() {
@@ -408,7 +450,10 @@ function buildChartScript(
       '<span class="metric"><strong>Win Rate:</strong> ' + meta.winRate + '</span>' +
       '<span class="metric"><strong>Max DD:</strong> ' + meta.maxDrawdown + '</span>' +
       '<span class="metric"><strong>Sharpe:</strong> ' + meta.sharpe + '</span>' +
-      '<span class="metric"><strong>PF:</strong> ' + meta.profitFactor + '</span>';
+      '<span class="metric"><strong>Sortino:</strong> ' + meta.sortino + '</span>' +
+      '<span class="metric"><strong>PF:</strong> ' + meta.profitFactor + '</span>' +
+      '<span class="metric"><strong>Recovery:</strong> ' + meta.recoveryFactor + '</span>' +
+      '<span class="metric"><strong>Expectancy:</strong> $' + meta.expectancy + '</span>';
 
     var modal = document.getElementById('chart-modal');
     modal.classList.remove('hidden');
@@ -623,6 +668,8 @@ function buildAveragesTable(results: SimulationResult[]): string {
           <td>${a.avgWinRate}%</td>
           <td>${a.avgSharpe}</td>
           <td>${a.avgMaxDrawdown}%</td>
+          <td>${a.avgSortino}</td>
+          <td class="${colorClass(a.avgExpectancy)}">$${a.avgExpectancy}</td>
         </tr>`,
     )
     .join('\n')
@@ -632,7 +679,7 @@ function buildAveragesTable(results: SimulationResult[]): string {
         <tr>
           <th>Strategy</th><th>Category</th><th>Simulations</th>
           <th>Avg Initial Capital</th><th>Avg Final Capital</th><th>Avg Trades</th>
-          <th>Avg Profit vs HODL</th><th>Avg Win Rate</th><th>Avg Sharpe</th><th>Avg Max Drawdown</th>
+          <th>Avg Profit vs HODL</th><th>Avg Win Rate</th><th>Avg Sharpe</th><th>Avg Max Drawdown</th><th>Avg Sortino</th><th>Avg Expectancy</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -660,6 +707,9 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <td>${r.data.maxDrawdown ?? 'N/A'}</td>
           <td>${r.data.sharpeRatio ?? 'N/A'}</td>
           <td>${r.data.nbPosition ?? 0}</td>
+          <td>${r.data.sortino ?? 'N/A'}</td>
+          <td class="${colorClass(r.data.expectancy ?? 0)}">$${r.data.expectancy ?? 0}</td>
+          <td>${r.data.recoveryFactor ?? 'N/A'}</td>
           <td><button class="chart-btn" onclick="openChart('${resultKey}')">Chart</button></td>
         </tr>`
     })
@@ -682,6 +732,9 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <th data-col="11" data-type="percent">Max Drawdown <span class="sort-arrow"></span></th>
           <th data-col="12" data-type="number">Sharpe <span class="sort-arrow"></span></th>
           <th data-col="13" data-type="number">Trades <span class="sort-arrow"></span></th>
+          <th data-col="14" data-type="number">Sortino <span class="sort-arrow"></span></th>
+          <th data-col="15" data-type="money">Expectancy <span class="sort-arrow"></span></th>
+          <th data-col="16" data-type="number">Recovery <span class="sort-arrow"></span></th>
           <th>Chart</th>
         </tr>
       </thead>
@@ -715,7 +768,10 @@ export function generateHtml(
       winRate: string
       maxDrawdown: string
       sharpe: number
+      sortino: number
       profitFactor: number | string
+      recoveryFactor: number
+      expectancy: number
     }
   > = {}
 
@@ -734,7 +790,10 @@ export function generateHtml(
       winRate: r.data.percentagePosition ?? 'N/A',
       maxDrawdown: r.data.maxDrawdown ?? 'N/A',
       sharpe: r.data.sharpeRatio ?? 0,
+      sortino: r.data.sortino ?? 0,
       profitFactor: r.data.profitFactor ?? 'N/A',
+      recoveryFactor: r.data.recoveryFactor ?? 0,
+      expectancy: r.data.expectancy ?? 0,
     }
   }
 

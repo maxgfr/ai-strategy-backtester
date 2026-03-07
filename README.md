@@ -4,7 +4,7 @@ Crypto strategy backtester using Binance historical data. Define trading strateg
 
 ## Features
 
-- **35 technical indicators** — RSI, MACD, Supertrend, Bollinger Bands, Ichimoku, KDJ, StochRSI, and more
+- **51 technical indicators** — RSI, MACD, Supertrend, Bollinger Bands, Ichimoku, KDJ, StochRSI, HMA, Choppiness Index, Ultimate Oscillator, and more
 - **Declarative JSON strategies** — no code required, compose indicators with buy/sell/short/cover conditions
 - **Timeframe auto-scaling** — indicator periods automatically adapt based on running timeframe (4h reference)
 - **AI strategy generation** — describe a strategy in natural language, get a validated JSON file
@@ -31,17 +31,17 @@ pnpm backtest
 pnpm backtest:report
 
 # Targeted backtest
-pnpm backtest ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-buy
+pnpm backtest ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-trend-ride
 
 # Targeted + open report
-pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-buy
+pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-trend-ride
 ```
 
 ## Strategies
 
 All strategies live as `.json` files in `strategies/`. They are auto-discovered on each run. No prefix conventions — all names are plain kebab-case.
 
-### Available Strategies (25)
+### Available Strategies (29)
 
 | Strategy | Description |
 |----------|-------------|
@@ -51,23 +51,27 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `supertrend-pullback-momentum` | Supertrend dip buyer + RSI pullback |
 | `supertrend` | ATR-based trend following |
 | `confluence` | Multi-indicator score mode (PMAX + Supertrend + ADX + RSI + MACD) |
-| `rsi-macd-buy` | RSI oversold + MACD histogram |
 | `pmax` | EMA + ATR-based Supertrend |
 | `breakout-volume` | Donchian breakout + ADX + volume |
 | `stochrsi-trend-filter` | StochRSI crossover in Supertrend uptrend |
 | `atr-trailing-vortex` | Vortex crossover + ATR trailing stop |
 | `kdj-extreme-recovery` | KDJ J-line recovery in uptrend |
-| `kdj-ema-scalp` | KDJ + EMA crossover scalp |
+| `kdj-ema-scalp` | KDJ + Supertrend scalp |
 | `bollinger-squeeze` | BB squeeze breakout + MACD + ADX |
 | `ichimoku-cloud` | Ichimoku cloud trend following |
 | `chandelier-exit` | Chandelier exit + ADX trend filter |
-| `mean-reversion-bb` | BB lower band + RSI mean reversion |
-| `fast-supertrend` | Fast Supertrend + MACD + ADX |
+| `fast-supertrend` | Fast Supertrend + RSI + ADX |
 | `scalp-rsi-bb` | BB mean reversion + RSI + volume |
 | `vwap-momentum` | VWAP-gated score mode |
+| `cci-williams-momentum` | CCI zero-cross + Williams %R + Supertrend |
+| `hull-chop-momentum` | HMA trend + Choppiness filter + UO oversold dip |
+| `fisher-pullback` | Fisher Transform + RSI + HMA trend pullback |
+| `force-trend` | Force Index zero-cross + ADX + Linear Regression Slope |
+| `vwma-chop-breakout` | VWMA/SMA divergence + Choppiness breakout |
+| `coppock-bottom` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
 | `supertrend-flip` | Long/short Supertrend flip (2x leverage) |
 | `rsi-reversal` | RSI mean reversion long/short (2x) |
-| `macd-crossover` | MACD crossover long/short (3x) |
+| `macd-crossover` | MACD crossover long/short (2x) |
 | `bb-mean-reversion` | BB long lower / short upper (2x) |
 | `vortex-trend` | Vortex VI+/VI- trend long/short (2x) |
 
@@ -109,7 +113,7 @@ Write a JSON file in `strategies/`:
 
 **Auto-scaling:** Tune indicator periods for 4h (reference timeframe). The engine automatically scales periods for other timeframes using sqrt dampening.
 
-See [`STRATEGY_PROMPT.md`](STRATEGY_PROMPT.md) for the full specification: JSON schema, all 35 indicators with parameters, value reference syntax, anti-patterns, and examples.
+See [`STRATEGY_PROMPT.md`](STRATEGY_PROMPT.md) for the full specification: JSON schema, all 51 indicators with parameters, value reference syntax, anti-patterns, and examples.
 
 ### AI Generation
 
@@ -129,6 +133,7 @@ All settings in `config.json` with a flat format:
 
 - **`fees`** — trading fees (default 0.26%)
 - **`fundingRate`** — perpetual futures funding rate (applied every 8h, default 0.01%)
+- **`slippage`** — slippage per trade (default 0.1%)
 - **`initialCapital`** — starting capital
 - **`symbols`** — trading pairs to backtest across
 - **`dates`** — date ranges for backtesting
@@ -137,10 +142,10 @@ All settings in `config.json` with a flat format:
 ```json
 {
   "strategies": {
-    "rsi-macd-buy": {
+    "rsi-macd-trend-ride": {
       "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.15,
-      "trailing_stop_pct": 0.2
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
     }
   }
 }
@@ -156,7 +161,8 @@ pnpm report
 The report includes:
 - Best strategy cards (Long-Only vs Shorting comparison)
 - Filter buttons to toggle by category
-- Full rankings table with profit, win rate, max drawdown, Sharpe ratio
+- Full rankings table with profit, win rate, max drawdown, Sharpe, Sortino, expectancy, recovery factor
+- Equity curve overlay in chart modal
 - Strategy averages across timeframes
 
 ## Development

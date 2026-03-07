@@ -10,7 +10,7 @@ Your output must be a single valid JSON object following the schema below. No ex
 
 - Name: `kebab-case-name` (no prefixes)
 - Indicator periods: use **standard 4h defaults** (RSI 14, MACD 12/26/9, ADX 14, etc.)
-- **Timeframe auto-scaling**: indicator periods automatically scale based on the running timeframe. Strategies are designed for 4h reference; the engine adjusts periods for other intervals using `sqrt(240 / tfMinutes)`. Only period-like params are scaled; multiplier/stdDev stay fixed.
+- **Timeframe auto-scaling**: indicator periods automatically scale based on the running timeframe. Strategies are designed for 4h reference; the engine adjusts periods for other intervals using `sqrt(240 / tfMinutes)`. Only period-like params are scaled; multiplier/stdDev stay fixed. Minimum period is 2 (the engine enforces `Math.max(2, round(period * scale))`).
 - Strategies can optionally go both long and short by adding `short` + `cover` blocks with `leverage`
 
 ---
@@ -113,7 +113,7 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 
 ---
 
-## Available Indicators (35 total)
+## Available Indicators (51 total)
 
 ### Number output (use directly: `"rsi"`, `"ema"`)
 
@@ -137,6 +137,19 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 | `volumeOscillator` | `fastPeriod=14, slowPeriod=28` | Volume momentum (%) |
 | `volumeSma` | `period=20` | SMA of volume (not price) |
 | `atrRatio` | `atrPeriod=14, smaPeriod=50` | ATR / SMA(ATR) — volatility regime |
+| `ravi` | `shortPeriod=7, longPeriod=65` | Range Action Verification Index (%) — >3 trending |
+| `hma` | `period=16` | Hull Moving Average — fast, low-lag trend line |
+| `choppinessIndex` | `period=14` | Choppiness Index (0-100) — >61.8 choppy, <38.2 trending |
+| `ultimateOscillator` | `period1=7, period2=14, period3=28` | Multi-timeframe momentum (0-100) |
+| `chaikinOscillator` | `fastPeriod=3, slowPeriod=10` | EMA(fast,AD) - EMA(slow,AD) — volume momentum |
+| `linearRegressionSlope` | `period=14` | Slope of linear regression — positive=uptrend |
+| `coppockCurve` | `rocPeriod1=14, rocPeriod2=11, wmaPeriod=10` | Coppock Curve — long-term bottom detector |
+| `forceIndex` | `period=13` | Force Index — price change × volume, EMA smoothed |
+| `dpo` | `period=20` | Detrended Price Oscillator — isolates cycles |
+| `vwma` | `period=20` | Volume Weighted Moving Average |
+| `massIndex` | `emaPeriod=9, sumPeriod=25` | Mass Index — reversal bulge >27 then <26.5 |
+| `emv` | `period=14` | Ease of Movement — price/volume relationship |
+| `mcginleyDynamic` | `period=14` | Auto-adjusting MA — less whipsaw than EMA |
 
 ### Object output (use with field: `"macd.histogram"`, `"adx.adx"`)
 
@@ -159,6 +172,9 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 | `pmo` | `smooth1Period=35, smooth2Period=20, signalPeriod=10` | **pmo**, signal |
 | `kdj` | `rsvPeriod=9, kPeriod=3, dPeriod=3` | **k**, d, j |
 | `stochRsi` | `rsiPeriod=14, stochasticPeriod=14, kPeriod=3, dPeriod=3` | **k**, d |
+| `elderRay` | `period=13` | **bullPower**, bearPower |
+| `fisherTransform` | `period=10` | **fisher**, signal |
+| `rvi` | `period=10` | **rvi**, signal |
 
 ---
 
@@ -183,8 +199,8 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 
 ```json
 {
-  "name": "rsi-macd-buy",
-  "description": "Buy when RSI is oversold and MACD histogram is positive",
+  "name": "rsi-macd-trend-ride",
+  "description": "Buy when RSI is oversold and MACD histogram is positive, ride until RSI overbought",
   "indicators": {
     "rsi": { "period": 14 },
     "macd": { "fast": 12, "slow": 26, "signal": 9 }
@@ -195,7 +211,7 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
   },
   "sell": {
     "mode": "any",
-    "conditions": [["rsi", ">", 70]]
+    "conditions": [["rsi", ">", 80]]
   }
 }
 ```
@@ -392,7 +408,7 @@ These are common mistakes that produce bad strategies. Avoid them:
 
 These are proven insights from backtesting 20+ strategies on ETHUSDT 2022-2026:
 
-1. **Simple > Complex** — The best strategy (rsi-macd-buy, 249% profit) has only 2 buy conditions and 1 sell condition. More conditions != better.
+1. **Simple > Complex** — The best strategy (rsi-macd-trend-ride, 249% profit) has only 2 buy conditions and 1 sell condition. More conditions != better.
 2. **Rare signals win** — RSI < 35 + MACD histogram > 0 triggers only 9 trades in 4 years but catches exact market bottoms. Don't optimize for trade count.
 3. **Trend filter is essential** — In the 2022 bear market, most RSI-based strategies without Supertrend/EMA trend filter lost money.
 4. **ADX > 20 reduces noise** — Adding `["adx.adx", ">", 20]` removes signals in ranging/choppy markets.
@@ -419,6 +435,19 @@ Use these as reference when setting condition thresholds:
 | `cci` | < -100 | > 100 | — |
 | `macd.histogram` | < 0 | > 0 | — |
 | `atrRatio` | < 0.5 (low vol) | > 1.5 (high vol) | ~1.0 = normal |
+| `ravi` | < 3 (ranging) | > 3 (trending) | — |
+| `elderRay.bullPower` | < 0 (bearish) | > 0 (bullish) | — |
+| `choppinessIndex` | < 38.2 (trending) | > 61.8 (choppy) | — |
+| `ultimateOscillator` | < 30 (oversold) | > 70 (overbought) | 50 = neutral |
+| `chaikinOscillator` | < 0 (bearish) | > 0 (bullish) | — |
+| `linearRegressionSlope` | < 0 (downtrend) | > 0 (uptrend) | magnitude = strength |
+| `fisherTransform.fisher` | < -1 (oversold) | > 1 (overbought) | cross signal = entry |
+| `rvi.rvi` | < 0 (bearish) | > 0 (bullish) | cross signal = entry |
+| `coppockCurve` | < 0 (bearish) | > 0 (bullish, buy) | zero cross from below = buy |
+| `forceIndex` | < 0 (bears) | > 0 (bulls) | magnitude = conviction |
+| `dpo` | < 0 (below trend) | > 0 (above trend) | cycles around 0 |
+| `massIndex` | — | > 27 (bulge) | drop < 26.5 after bulge = reversal |
+| `emv` | < 0 (hard down) | > 0 (easy up) | — |
 | `bollingerBands.bbr` | < 0 (below lower band) | > 1 (above upper band) | 0.5 = at middle |
 
 ---

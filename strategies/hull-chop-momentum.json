@@ -1,0 +1,21 @@
+{
+  "name": "hull-chop-momentum",
+  "description": "HMA trend + Choppiness filter + Ultimate Oscillator dip — buys UO oversold pullbacks in trending HMA uptrend, exits on overbought or trend loss",
+  "indicators": {
+    "hma": { "period": 16 },
+    "choppinessIndex": { "period": 14 },
+    "ultimateOscillator": { "period1": 7, "period2": 14, "period3": 28 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["close", ">", "hma"],
+      ["choppinessIndex", "<", 50],
+      ["ultimateOscillator", "<", 35]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["ultimateOscillator", ">", 70], ["close", "<", "hma"]]
+  }
+}

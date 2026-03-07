@@ -18,8 +18,14 @@ describe('JSON strategies via registry', () => {
     expect(names).toContain('supertrend')
     expect(names).toContain('turtle')
     expect(names).toContain('confluence')
-    expect(names).toContain('rsi-macd-buy')
+    expect(names).toContain('rsi-macd-trend-ride')
     expect(names).toContain('breakout-volume')
+    expect(names).toContain('cci-williams-momentum')
+    expect(names).toContain('hull-chop-momentum')
+    expect(names).toContain('fisher-pullback')
+    expect(names).toContain('force-trend')
+    expect(names).toContain('vwma-chop-breakout')
+    expect(names).toContain('coppock-bottom')
   })
 
   it('throws for unknown strategy', () => {

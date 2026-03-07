@@ -1,7 +1,7 @@
 {
   "name": "macd-crossover",
   "description": "MACD crossover long/short — long when MACD above signal in uptrend, short when below in downtrend",
-  "leverage": 3,
+  "leverage": 2,
   "indicators": {
     "macd": { "fast": 12, "slow": 26, "signal": 9 },
     "adx": { "period": 14 },

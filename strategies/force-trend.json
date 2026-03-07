@@ -1,0 +1,22 @@
+{
+  "name": "force-trend",
+  "description": "Force Index zero-cross entry with ADX trend strength + Linear Regression Slope direction filter — Elder-style volume-momentum in strong trends",
+  "indicators": {
+    "forceIndex": { "period": 13 },
+    "adx": { "period": 14 },
+    "linearRegressionSlope": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["forceIndex", ">", 0],
+      ["forceIndex[-1]", "<", 0],
+      ["adx.adx", ">", 20],
+      ["linearRegressionSlope", ">", 0]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["forceIndex", "<", 0], ["linearRegressionSlope", "<", 0]]
+  }
+}

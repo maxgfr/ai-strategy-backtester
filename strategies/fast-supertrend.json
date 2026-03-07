@@ -15,7 +15,7 @@
     ]
   },
   "sell": {
-    "mode": "all",
-    "conditions": [["close", "<", "supertrend"]]
+    "mode": "any",
+    "conditions": [["close", "<", "supertrend"], ["rsi", ">", 75]]
   }
 }

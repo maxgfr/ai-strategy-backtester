@@ -92,7 +92,11 @@ function computeTradeStats(db: IDatabase): void {
   db.set('shortProfit', round(shortProfit))
 }
 
-function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
+function computeAdvancedMetrics(
+  db: IDatabase,
+  initialCapital: number,
+  backtestDays: number,
+): void {
   const allPosition = db.get('historicPosition')
   const tradeProfits = allPosition
     .filter((p) => p.tradeProfit !== undefined)
@@ -103,17 +107,24 @@ function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
     db.set('maxDrawdown', '0%')
     db.set('sharpeRatio', 0)
     db.set('avgTradeProfit', 0)
+    db.set('sortino', 0)
+    db.set('calmarRatio', 0)
+    db.set('recoveryFactor', 0)
+    db.set('avgWin', 0)
+    db.set('avgLoss', 0)
+    db.set('maxConsecutiveWins', 0)
+    db.set('maxConsecutiveLosses', 0)
+    db.set('expectancy', 0)
     return
   }
 
-  const grossProfit = tradeProfits
-    .filter((p) => p > 0)
-    .reduce((s, p) => s + p, 0)
-  const grossLoss = Math.abs(
-    tradeProfits.filter((p) => p < 0).reduce((s, p) => s + p, 0),
-  )
+  const wins = tradeProfits.filter((p) => p > 0)
+  const losses = tradeProfits.filter((p) => p < 0)
+  const grossProfit = wins.reduce((s, p) => s + p, 0)
+  const grossLoss = Math.abs(losses.reduce((s, p) => s + p, 0))
   const profitFactor = grossLoss === 0 ? 9999 : round(grossProfit / grossLoss)
 
+  // Max drawdown
   let maxDrawdown = 0
   let peak = initialCapital
   for (const pos of allPosition) {
@@ -127,10 +138,76 @@ function computeAdvancedMetrics(db: IDatabase, initialCapital: number): void {
     tradeProfits.reduce((s, p) => s + (p - mean) ** 2, 0) / tradeProfits.length
   const stdDev = Math.sqrt(variance)
 
+  // Annualized Sharpe: multiply by sqrt(trades per year)
+  const backtestYears = Math.max(backtestDays / 365, 0.01)
+  const tradesPerYear = tradeProfits.length / backtestYears
+  const annualizationFactor = Math.sqrt(tradesPerYear)
+  const sharpe = stdDev === 0 ? 0 : round((mean / stdDev) * annualizationFactor)
+
+  // Sortino: downside deviation only
+  const downsideReturns = tradeProfits.filter((p) => p < 0)
+  const downsideVariance =
+    downsideReturns.length === 0
+      ? 0
+      : downsideReturns.reduce((s, p) => s + p ** 2, 0) / tradeProfits.length
+  const downsideDev = Math.sqrt(downsideVariance)
+  const sortino =
+    downsideDev === 0 ? 0 : round((mean / downsideDev) * annualizationFactor)
+
+  // Total return for Calmar/Recovery
+  const finalCapital = db.get('position').capital
+  const totalReturn = finalCapital - initialCapital
+
+  // Calmar Ratio: annualized return / max drawdown
+  const annualizedReturn = totalReturn / backtestYears
+  const calmarRatio =
+    maxDrawdown === 0
+      ? 0
+      : round(annualizedReturn / (maxDrawdown * initialCapital))
+
+  // Recovery Factor: total return / max drawdown (dollar)
+  const maxDrawdownDollar = maxDrawdown * peak
+  const recoveryFactor =
+    maxDrawdownDollar === 0 ? 0 : round(totalReturn / maxDrawdownDollar)
+
+  // Avg win / avg loss
+  const avgWin = wins.length === 0 ? 0 : round(grossProfit / wins.length)
+  const avgLoss = losses.length === 0 ? 0 : round(grossLoss / losses.length)
+
+  // Max consecutive wins/losses
+  let maxConsWins = 0
+  let maxConsLosses = 0
+  let consWins = 0
+  let consLosses = 0
+  for (const p of tradeProfits) {
+    if (p > 0) {
+      consWins++
+      consLosses = 0
+      if (consWins > maxConsWins) maxConsWins = consWins
+    } else {
+      consLosses++
+      consWins = 0
+      if (consLosses > maxConsLosses) maxConsLosses = consLosses
+    }
+  }
+
+  // Expectancy: (avgWin × winRate) - (avgLoss × lossRate)
+  const winRate = wins.length / tradeProfits.length
+  const lossRate = losses.length / tradeProfits.length
+  const expectancy = round(avgWin * winRate - avgLoss * lossRate)
+
   db.set('profitFactor', profitFactor)
   db.set('maxDrawdown', `${round(maxDrawdown * 100)}%`)
-  db.set('sharpeRatio', stdDev === 0 ? 0 : round(mean / stdDev))
+  db.set('sharpeRatio', sharpe)
   db.set('avgTradeProfit', round(mean))
+  db.set('sortino', sortino)
+  db.set('calmarRatio', calmarRatio)
+  db.set('recoveryFactor', recoveryFactor)
+  db.set('avgWin', avgWin)
+  db.set('avgLoss', avgLoss)
+  db.set('maxConsecutiveWins', maxConsWins)
+  db.set('maxConsecutiveLosses', maxConsLosses)
+  db.set('expectancy', expectancy)
 }
 
 type SimulationOptions = {
@@ -138,6 +215,7 @@ type SimulationOptions = {
   stopLossPct?: number
   trailingStopPct?: number
   fundingRate: number
+  slippage: number
 }
 
 async function simulation(
@@ -161,7 +239,7 @@ async function simulation(
   )
 
   const { fees, initialCapital } = config
-  const { leverage, stopLossPct, trailingStopPct, fundingRate } = opts
+  const { leverage, stopLossPct, trailingStopPct, fundingRate, slippage } = opts
   const window: CandleStick[] = []
 
   let peakPrice = 0
@@ -216,14 +294,15 @@ async function simulation(
       // Long liquidation: price <= entry * (1 - 1/leverage)
       const liqPrice = lastPosition.price * (1 - 1 / leverage)
       if (candle.low <= liqPrice) {
-        // Liquidated — capital = 0
+        // Liquidated — capital = 0, include accumulated funding in loss
+        const totalLoss = lastPosition.capital + accumulatedFunding
         const position = {
           date: date.toISOString(),
           type: 'sell' as const,
           price: liqPrice,
           capital: 0,
           assets: 0,
-          tradeProfit: -lastPosition.capital,
+          tradeProfit: -totalLoss,
         }
         db.set('position', position)
         db.push('historicPosition', position)
@@ -236,13 +315,14 @@ async function simulation(
       // Short liquidation: price >= entry * (1 + 1/leverage)
       const liqPrice = lastPosition.price * (1 + 1 / leverage)
       if (candle.high >= liqPrice) {
+        const totalLoss = lastPosition.capital + accumulatedFunding
         const position = {
           date: date.toISOString(),
           type: 'sell' as const,
           price: liqPrice,
           capital: 0,
           assets: 0,
-          tradeProfit: -lastPosition.capital,
+          tradeProfit: -totalLoss,
         }
         db.set('position', position)
         db.push('historicPosition', position)
@@ -302,21 +382,25 @@ async function simulation(
     const signal = strategy(dataWindow, lastPosition.type)
 
     if (signal === 'buy' && lastPosition.type !== 'buy') {
-      executeBuy(price, date, db, fees, leverage)
-      peakPrice = price
+      const buyPrice = price * (1 + slippage)
+      executeBuy(buyPrice, date, db, fees, leverage)
+      peakPrice = buyPrice
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
     } else if (signal === 'sell' && lastPosition.type !== 'sell') {
-      executeSell(price, date, db, fees, leverage, accumulatedFunding)
+      const sellPrice = price * (1 - slippage)
+      executeSell(sellPrice, date, db, fees, leverage, accumulatedFunding)
       peakPrice = 0
       accumulatedFunding = 0
     } else if (signal === 'short' && lastPosition.type !== 'short') {
-      executeShort(price, date, db, fees, leverage)
-      troughPrice = price
+      const shortPrice = price * (1 - slippage)
+      executeShort(shortPrice, date, db, fees, leverage)
+      troughPrice = shortPrice
       peakPrice = 0
       accumulatedFunding = 0
     } else if (signal === 'cover' && lastPosition.type === 'short') {
-      executeCover(price, date, db, fees, leverage, accumulatedFunding)
+      const coverPrice = price * (1 + slippage)
+      executeCover(coverPrice, date, db, fees, leverage, accumulatedFunding)
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
     }
@@ -343,7 +427,9 @@ async function simulation(
       )
       db.set('totalFundingPaid', round(totalFundingPaid))
       computeTradeStats(db)
-      computeAdvancedMetrics(db, initialCapital)
+      const backtestDays =
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      computeAdvancedMetrics(db, initialCapital, backtestDays)
     }
   }
 
@@ -375,6 +461,7 @@ export async function runSingleSimulation(
       stopLossPct: strategyConfig?.stop_loss_pct,
       trailingStopPct: strategyConfig?.trailing_stop_pct,
       fundingRate: config.fundingRate,
+      slippage: config.slippage,
     },
   )
 }
