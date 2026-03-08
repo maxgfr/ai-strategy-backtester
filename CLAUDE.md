@@ -207,15 +207,15 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **VWAP Momentum** | `vwap-momentum.json` | VWAP-gated score mode momentum |
 | **Supertrend Flip** | `supertrend-flip.json` | Long/short Supertrend flip (2x leverage) |
 | **RSI Reversal** | `rsi-reversal.json` | RSI mean reversion long/short (2x) |
+| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (2x) |
+| **BB Mean Reversion** | `bb-mean-reversion.json` | BB long lower / short upper (2x) |
+| **Vortex Trend** | `vortex-trend.json` | Vortex VI+/VI- trend long/short (2x) |
 | **CCI Williams Momentum** | `cci-williams-momentum.json` | CCI zero-cross + Williams %R oversold + Supertrend |
 | **Hull Chop Momentum** | `hull-chop-momentum.json` | HMA trend + Choppiness filter + UO oversold dip |
 | **Fisher Pullback** | `fisher-pullback.json` | Fisher Transform + RSI + HMA trend pullback |
 | **Force Trend** | `force-trend.json` | Force Index zero-cross + ADX + Linear Regression Slope |
 | **VWMA Chop Breakout** | `vwma-chop-breakout.json` | VWMA/SMA divergence + Choppiness breakout |
 | **Coppock Bottom** | `coppock-bottom.json` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
-| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (2x) |
-| **BB Mean Reversion** | `bb-mean-reversion.json` | BB long lower / short upper (2x) |
-| **Vortex Trend** | `vortex-trend.json` | Vortex VI+/VI- trend long/short (2x) |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories, no pattern matching. Each returns `Signal = 'buy' | 'sell' | 'short' | 'cover'`.
 

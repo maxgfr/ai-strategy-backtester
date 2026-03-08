@@ -63,17 +63,17 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `fast-supertrend` | Fast Supertrend + RSI + ADX |
 | `scalp-rsi-bb` | BB mean reversion + RSI + volume |
 | `vwap-momentum` | VWAP-gated score mode |
+| `supertrend-flip` | Long/short Supertrend flip (2x leverage) |
+| `rsi-reversal` | RSI mean reversion long/short (2x) |
+| `macd-crossover` | MACD crossover long/short (2x) |
+| `bb-mean-reversion` | BB long lower / short upper (2x) |
+| `vortex-trend` | Vortex VI+/VI- trend long/short (2x) |
 | `cci-williams-momentum` | CCI zero-cross + Williams %R + Supertrend |
 | `hull-chop-momentum` | HMA trend + Choppiness filter + UO oversold dip |
 | `fisher-pullback` | Fisher Transform + RSI + HMA trend pullback |
 | `force-trend` | Force Index zero-cross + ADX + Linear Regression Slope |
 | `vwma-chop-breakout` | VWMA/SMA divergence + Choppiness breakout |
 | `coppock-bottom` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
-| `supertrend-flip` | Long/short Supertrend flip (2x leverage) |
-| `rsi-reversal` | RSI mean reversion long/short (2x) |
-| `macd-crossover` | MACD crossover long/short (2x) |
-| `bb-mean-reversion` | BB long lower / short upper (2x) |
-| `vortex-trend` | Vortex VI+/VI- trend long/short (2x) |
 
 ### Creating a Strategy
 

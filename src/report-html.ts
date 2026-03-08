@@ -205,7 +205,15 @@ function buildStyles(): string {
     .trade-table th { background: #161b22; color: #8b949e; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; padding: 0.5rem 0.75rem; text-align: left; border-bottom: 2px solid #30363d; position: sticky; top: 0; cursor: default; }
     .trade-table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #21262d; }
     .trade-table tr:hover { background: #161b22; }
-    @media (max-width: 900px) { .comparison-row { grid-template-columns: 1fr; } #chart-container { height: 350px; } }`
+    .top10-podium-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .top10-podium { background: linear-gradient(135deg, #1a2332, #1e293b); border: 2px solid #30363d; border-radius: 12px; padding: 1.25rem; }
+    .top10-rank { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .top10-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .top10-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-top: 0.75rem; }
+    .top10-stat { background: #161b22; border-radius: 6px; padding: 0.5rem 0.75rem; }
+    .top10-stat .label { display: block; font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.3px; }
+    .top10-stat .value { display: block; font-size: 0.95rem; font-weight: 600; margin-top: 0.15rem; }
+    @media (max-width: 900px) { .comparison-row { grid-template-columns: 1fr; } #chart-container { height: 350px; } .top10-podium-row { grid-template-columns: 1fr; } }`
 }
 
 function buildChartScript(
@@ -652,6 +660,71 @@ function buildFilterButtons(results: SimulationResult[]): string {
   return html
 }
 
+function buildTop10Section(results: SimulationResult[]): string {
+  const averages = computeStrategyAverages(results)
+  const top10 = averages.slice(0, 10)
+  if (top10.length === 0) return ''
+
+  const medals = ['🥇', '🥈', '🥉']
+  const podiumColors = ['#ffd700', '#c0c0c0', '#cd7f32']
+
+  const podiumCards = top10
+    .slice(0, 3)
+    .map((a, i) => {
+      const medal = medals[i]
+      const color = podiumColors[i]
+      const profitClass = a.avgProfitPercent > 0 ? 'positive' : 'negative'
+      return `<div class="top10-podium" style="border-color: ${color}">
+        <div class="top10-rank" style="color: ${color}">${medal} #${i + 1}</div>
+        <div class="top10-name">${a.strategy.toUpperCase()}</div>
+        <span class="category-badge ${categoryBadgeClass(a.category)}">${a.category}</span>
+        <div class="top10-stats">
+          <div class="top10-stat"><span class="label">Avg Profit</span><span class="value ${profitClass}">${a.avgProfitPercent}%</span></div>
+          <div class="top10-stat"><span class="label">Avg Trades</span><span class="value">${a.avgTrades}</span></div>
+          <div class="top10-stat"><span class="label">Avg Win Rate</span><span class="value">${a.avgWinRate}%</span></div>
+          <div class="top10-stat"><span class="label">Avg Max DD</span><span class="value">${a.avgMaxDrawdown}%</span></div>
+          <div class="top10-stat"><span class="label">Avg Sharpe</span><span class="value">${a.avgSharpe}</span></div>
+          <div class="top10-stat"><span class="label">Avg Expectancy</span><span class="value ${colorClass(a.avgExpectancy)}">$${a.avgExpectancy}</span></div>
+        </div>
+      </div>`
+    })
+    .join('')
+
+  const listRows = top10
+    .slice(3)
+    .map(
+      (a, i) => `<tr>
+        <td><strong>#${i + 4}</strong></td>
+        <td><strong>${a.strategy.toUpperCase()}</strong></td>
+        <td><span class="category-badge ${categoryBadgeClass(a.category)}">${a.category}</span></td>
+        <td class="${colorClass(a.avgProfitPercent)}">${a.avgProfitPercent}%</td>
+        <td>${a.avgTrades}</td>
+        <td>${a.avgWinRate}%</td>
+        <td>${a.avgMaxDrawdown}%</td>
+        <td>${a.avgSharpe}</td>
+        <td>${a.avgSortino}</td>
+        <td class="${colorClass(a.avgExpectancy)}">$${a.avgExpectancy}</td>
+      </tr>`,
+    )
+    .join('')
+
+  const listTable =
+    top10.length > 3
+      ? `<div class="table-wrapper" style="margin-top: 1rem;">
+      <table>
+        <thead><tr>
+          <th>Rank</th><th>Strategy</th><th>Category</th><th>Avg Profit</th><th>Avg Trades</th><th>Avg Win Rate</th><th>Avg Max DD</th><th>Avg Sharpe</th><th>Avg Sortino</th><th>Avg Expectancy</th>
+        </tr></thead>
+        <tbody>${listRows}</tbody>
+      </table>
+    </div>`
+      : ''
+
+  return `<h2 class="section-title">Top 10 Strategy Analysis</h2>
+    <div class="top10-podium-row">${podiumCards}</div>
+    ${listTable}`
+}
+
 function buildAveragesTable(results: SimulationResult[]): string {
   const averages = computeStrategyAverages(results)
   const rows = averages
@@ -813,6 +886,8 @@ export function generateHtml(
   </div>
 
   ${buildComparisonCards(results, sorted)}
+
+  ${buildTop10Section(results)}
 
   <h2 class="section-title">Strategy Averages</h2>
   <div class="table-wrapper">${buildAveragesTable(results)}</div>
