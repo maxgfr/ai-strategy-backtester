@@ -3,14 +3,9 @@
   "fundingRate": 0.0001,
   "slippage": 0.001,
   "initialCapital": 10000,
-  "symbols": ["ETHUSDT", "BTCUSDT", "SOLUSDT"],
-  "dates": [{ "start": "2024-03-01", "end": "2026-03-01" }],
+  "symbols": ["ETHUSDT", "SOLUSDT"],
+  "dates": [{ "start": "2022-03-01", "end": "2026-03-01" }],
   "strategies": {
-    "mega-fusion": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
     "rsi-macd-trend-ride": {
       "timeframes": ["4h", "6h"],
       "stop_loss_pct": 0.08,
@@ -51,18 +46,8 @@
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
     },
-    "atr-trailing-vortex": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
     "kdj-extreme-recovery": {
       "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
-    "kdj-ema-scalp": {
-      "timeframes": ["1h", "4h"],
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
     },
@@ -76,18 +61,8 @@
       "stop_loss_pct": 0.1,
       "trailing_stop_pct": 0.15
     },
-    "chandelier-exit": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
     "fast-supertrend": {
       "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
-    "scalp-rsi-bb": {
-      "timeframes": ["1h", "4h"],
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
     },
@@ -96,47 +71,12 @@
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
     },
-    "supertrend-flip": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
-    "rsi-reversal": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "macd-crossover": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
-    "bb-mean-reversion": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "vortex-trend": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
     "cci-williams-momentum": {
       "timeframes": ["4h", "6h"],
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
     },
     "hull-chop-momentum": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "fisher-pullback": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
-    },
-    "force-trend": {
       "timeframes": ["4h", "6h"],
       "stop_loss_pct": 0.1,
       "trailing_stop_pct": 0.15
@@ -150,6 +90,31 @@
       "timeframes": ["6h", "12h"],
       "stop_loss_pct": 0.1,
       "trailing_stop_pct": 0.15
+    },
+    "aroon-trend-rider": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "keltner-breakout": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "psar-momentum": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15
+    },
+    "elder-impulse": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
+    },
+    "dpo-rsi-pullback": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
     }
   },
   "generation": {

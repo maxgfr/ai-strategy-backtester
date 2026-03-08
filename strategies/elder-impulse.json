@@ -1,0 +1,25 @@
+{
+  "name": "elder-impulse",
+  "description": "Elder Ray bull/bear power impulse system with EMA trend and ADX filter",
+  "indicators": {
+    "elderRay": { "period": 13 },
+    "ema": { "period": 21 },
+    "adx": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["elderRay.bullPower", ">", 0],
+      ["elderRay.bearPower", ">", "elderRay.bearPower[-1]"],
+      ["close", ">", "ema"],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      ["elderRay.bearPower", "<", "elderRay.bearPower[-1]"],
+      ["close", "<", "ema"]
+    ]
+  }
+}

@@ -303,85 +303,84 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
 }
 ```
 
-### BB mean reversion scalper
+### Keltner channel breakout
 
 ```json
 {
-  "name": "scalp-rsi-bb",
-  "description": "BB mean reversion scalper — buy near lower band when RSI oversold and volume spikes",
+  "name": "keltner-breakout",
+  "description": "Keltner channel breakout with MACD confirmation and ADX trend filter",
   "indicators": {
-    "bollingerBands": { "period": 20, "stdDev": 2 },
-    "rsi": { "period": 14 },
-    "volumeSma": { "period": 20 }
-  },
-  "buy": {
-    "mode": "all",
-    "conditions": [
-      ["close", "<", "bollingerBands.lower"],
-      ["rsi", "<", 30],
-      ["volume", ">", "volumeSma"]
-    ]
-  },
-  "sell": {
-    "mode": "any",
-    "conditions": [["close", ">", "bollingerBands.middle"], ["rsi", ">", 70]]
-  }
-}
-```
-
-### Shorting: Supertrend flip long/short (2x leverage)
-
-```json
-{
-  "name": "supertrend-flip",
-  "description": "Always in position — long above Supertrend, short below with 2x leverage",
-  "leverage": 2,
-  "indicators": {
-    "supertrend": { "atrPeriod": 10, "multiplier": 3 },
+    "keltner": { "maPeriod": 20, "atrPeriod": 10, "multiplier": 1.5 },
+    "macd": { "fast": 12, "slow": 26, "signal": 9 },
     "adx": { "period": 14 }
   },
   "buy": {
     "mode": "all",
-    "conditions": [["close", ">", "supertrend"], ["adx.adx", ">", 20]]
-  },
-  "sell": {
-    "mode": "any",
-    "conditions": [["close", "<", "supertrend"]]
-  },
-  "short": {
-    "mode": "all",
-    "conditions": [["close", "<", "supertrend"], ["adx.adx", ">", 20]]
-  },
-  "cover": {
-    "mode": "any",
-    "conditions": [["close", ">", "supertrend"]]
-  }
-}
-```
-
-### Aliasing: Fast EMA crossover + KDJ
-
-```json
-{
-  "name": "kdj-ema-scalp",
-  "description": "KDJ J-extreme recovery + EMA crossover + volume spike",
-  "indicators": {
-    "kdj": { "rsvPeriod": 9, "kPeriod": 3, "dPeriod": 3 },
-    "emaFast": { "_type": "ema", "period": 10 },
-    "emaSlow": { "_type": "ema", "period": 26 },
-    "volumeSma": { "period": 20 }
-  },
-  "buy": {
-    "mode": "all",
     "conditions": [
-      ["kdj.j", "<", 20],
-      ["emaFast", ">", "emaSlow"],
-      ["volume", ">", "volumeSma"]
+      ["close", ">", "keltner.upper"],
+      ["macd.histogram", ">", 0],
+      ["adx.adx", ">", 20]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["kdj.j", ">", 80], ["emaFast", "<", "emaSlow"]]
+    "conditions": [["close", "<", "keltner.middle"], ["macd.histogram", "<", 0]]
+  }
+}
+```
+
+### Elder Ray impulse system
+
+```json
+{
+  "name": "elder-impulse",
+  "description": "Elder Ray bull/bear power impulse system with EMA trend and ADX filter",
+  "indicators": {
+    "elderRay": { "period": 13 },
+    "ema": { "period": 21 },
+    "adx": { "period": 14 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["elderRay.bullPower", ">", 0],
+      ["elderRay.bearPower", ">", "elderRay.bearPower[-1]"],
+      ["close", ">", "ema"],
+      ["adx.adx", ">", 20]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [
+      ["elderRay.bearPower", "<", "elderRay.bearPower[-1]"],
+      ["close", "<", "ema"]
+    ]
+  }
+}
+```
+
+### DPO cycle pullback
+
+```json
+{
+  "name": "dpo-rsi-pullback",
+  "description": "DPO rising cycle detection with RSI pullback in Supertrend uptrend",
+  "indicators": {
+    "dpo": { "period": 20 },
+    "rsi": { "period": 14 },
+    "supertrend": { "period": 10, "multiplier": 3 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [
+      ["dpo", ">", "dpo[-1]"],
+      ["rsi", "<", 40],
+      ["supertrend.direction", "==", 1]
+    ]
+  },
+  "sell": {
+    "mode": "any",
+    "conditions": [["rsi", ">", 75], ["supertrend.direction", "==", -1]]
   }
 }
 ```
@@ -455,16 +454,14 @@ Use these as reference when setting condition thresholds:
 ## Strategy Ideas to Try
 
 ### Long-Only
-- Ichimoku cloud breakout with volume confirmation
-- Keltner channel squeeze breakout
+- Mass Index reversal bulge (>27 then <26.5) + RSI oversold + trend filter
+- RVI signal crossover + Supertrend trend gate
+- EMV positive divergence + ADX trending + volume confirmation
+- Stochastic K/D crossover in Keltner lower zone
 - CMF accumulation + Aroon trend confirmation
-- Multi-timeframe moving average crossover (fast/slow EMA)
-- StochRSI bounce from lower Keltner band
-- VWAP gate + multi-indicator score
+- PMO zero-cross + EMA trend filter
 
 ### Long/Short (with leverage)
-- Supertrend directional flip — long above, short below (2x)
-- RSI mean reversion — long oversold, short overbought + MACD (2x)
-- MACD crossover — long bullish cross, short bearish cross in trend (3x)
-- Bollinger Bands — long lower band, short upper band with volume (2x)
-- Vortex trend — VI+/VI- crossover for direction + ATR trailing stop (2x)
+- Aroon Up/Down crossover — long when Up > Down, short when Down > Up (2x)
+- Fisher Transform — long oversold cross, short overbought cross (2x)
+- TRIX zero-cross — long above zero, short below zero with ADX (2x)

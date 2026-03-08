@@ -41,11 +41,10 @@ pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-trend-ride
 
 All strategies live as `.json` files in `strategies/`. They are auto-discovered on each run. No prefix conventions — all names are plain kebab-case.
 
-### Available Strategies (29)
+### Available Strategies (22)
 
 | Strategy | Description |
 |----------|-------------|
-| `mega-fusion` | PMAX gate + 10-indicator scored confluence |
 | `rsi-macd-trend-ride` | RSI oversold + MACD, RSI > 80 exit (best performer) |
 | `turtle` | 200-period Donchian breakout + trailing stop |
 | `supertrend-pullback-momentum` | Supertrend dip buyer + RSI pullback |
@@ -54,26 +53,20 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `pmax` | EMA + ATR-based Supertrend |
 | `breakout-volume` | Donchian breakout + ADX + volume |
 | `stochrsi-trend-filter` | StochRSI crossover in Supertrend uptrend |
-| `atr-trailing-vortex` | Vortex crossover + ATR trailing stop |
 | `kdj-extreme-recovery` | KDJ J-line recovery in uptrend |
-| `kdj-ema-scalp` | KDJ + Supertrend scalp |
 | `bollinger-squeeze` | BB squeeze breakout + MACD + ADX |
 | `ichimoku-cloud` | Ichimoku cloud trend following |
-| `chandelier-exit` | Chandelier exit + ADX trend filter |
 | `fast-supertrend` | Fast Supertrend + RSI + ADX |
-| `scalp-rsi-bb` | BB mean reversion + RSI + volume |
 | `vwap-momentum` | VWAP-gated score mode |
-| `supertrend-flip` | Long/short Supertrend flip (2x leverage) |
-| `rsi-reversal` | RSI mean reversion long/short (2x) |
-| `macd-crossover` | MACD crossover long/short (2x) |
-| `bb-mean-reversion` | BB long lower / short upper (2x) |
-| `vortex-trend` | Vortex VI+/VI- trend long/short (2x) |
 | `cci-williams-momentum` | CCI zero-cross + Williams %R + Supertrend |
 | `hull-chop-momentum` | HMA trend + Choppiness filter + UO oversold dip |
-| `fisher-pullback` | Fisher Transform + RSI + HMA trend pullback |
-| `force-trend` | Force Index zero-cross + ADX + Linear Regression Slope |
 | `vwma-chop-breakout` | VWMA/SMA divergence + Choppiness breakout |
 | `coppock-bottom` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
+| `aroon-trend-rider` | Aroon trend detection + RSI pullback + ADX filter |
+| `keltner-breakout` | Keltner channel breakout + MACD + ADX |
+| `psar-momentum` | Parabolic SAR + ROC momentum + RSI filter |
+| `elder-impulse` | Elder Ray bull/bear power + EMA trend + ADX |
+| `dpo-rsi-pullback` | DPO cycle detection + RSI pullback + Supertrend |
 
 ### Creating a Strategy
 

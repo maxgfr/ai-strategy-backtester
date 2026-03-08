@@ -23,35 +23,28 @@ Crypto strategy backtester using Binance historical data. Entry point is a plain
 
 ```
 strategies/                          # ALL strategies as JSON (no TS strategies, no prefixes)
-├── mega-fusion.json                 # PMAX gate + scored confluence (10 indicators)
 ├── rsi-macd-trend-ride.json         # RSI oversold + MACD, RSI > 80 exit ★ BEST
 ├── turtle.json                      # 200-period Donchian breakout + trailing stop
 ├── supertrend-pullback-momentum.json # Supertrend dip buyer
 ├── supertrend.json                  # ATR-based trend following
 ├── confluence.json                  # Multi-indicator scoring (PMAX + score mode)
-├── kdj-ema-scalp.json              # KDJ + Supertrend scalp
-├── bollinger-squeeze.json           # BB squeeze breakout + MACD + ADX
-├── ichimoku-cloud.json              # Ichimoku cloud trend following
-├── chandelier-exit.json             # Chandelier exit + ADX trend filter
 ├── pmax.json                        # PMAX trend following
 ├── breakout-volume.json             # Donchian breakout + volume
 ├── stochrsi-trend-filter.json       # StochRSI + Supertrend + ADX
-├── atr-trailing-vortex.json         # Vortex + ATR trailing stop
 ├── kdj-extreme-recovery.json        # KDJ J-line recovery
+├── bollinger-squeeze.json           # BB squeeze breakout + MACD + ADX
+├── ichimoku-cloud.json              # Ichimoku cloud trend following
 ├── fast-supertrend.json             # Fast Supertrend + RSI + ADX
-├── scalp-rsi-bb.json                # BB mean reversion + RSI + volume
 ├── vwap-momentum.json               # VWAP-gated momentum
 ├── cci-williams-momentum.json       # CCI zero-cross + Williams %R + Supertrend
 ├── hull-chop-momentum.json          # HMA + Choppiness filter + Ultimate Oscillator dip
-├── fisher-pullback.json             # Fisher Transform + RSI + HMA trend pullback
-├── force-trend.json                 # Force Index + ADX + Linear Regression Slope
 ├── vwma-chop-breakout.json          # VWMA/SMA divergence + Choppiness breakout
 ├── coppock-bottom.json              # Coppock Curve + McGinley Dynamic bottom picker
-├── supertrend-flip.json             # Long/short Supertrend flip (2x leverage)
-├── rsi-reversal.json                # RSI mean reversion long/short (2x)
-├── macd-crossover.json              # MACD crossover long/short (2x)
-├── bb-mean-reversion.json           # BB long lower / short upper (2x)
-└── vortex-trend.json                # Vortex VI+/VI- trend (2x)
+├── aroon-trend-rider.json           # Aroon trend + RSI pullback + ADX
+├── keltner-breakout.json            # Keltner channel breakout + MACD + ADX
+├── psar-momentum.json               # Parabolic SAR + ROC momentum + RSI
+├── elder-impulse.json               # Elder Ray impulse + EMA trend + ADX
+└── dpo-rsi-pullback.json            # DPO cycle + RSI pullback + Supertrend
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
 ├── generate.ts             # CLI entry point for AI strategy generation
@@ -187,35 +180,28 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 
 | Strategy | File | Description |
 |----------|------|-------------|
-| **Mega Fusion** | `mega-fusion.json` | PMAX gate + 10-indicator scored confluence |
 | **RSI-MACD Trend Ride** | `rsi-macd-trend-ride.json` | RSI oversold + MACD positive entry, RSI > 80 exit ★ BEST |
 | **Turtle** | `turtle.json` | 200-period Donchian breakout + trailing stop exit (`_type` aliasing) |
 | **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend dip buyer + RSI pullback + MACD + ADX |
 | **Supertrend** | `supertrend.json` | ATR-based trend-following |
 | **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume) |
-| **KDJ EMA Scalp** | `kdj-ema-scalp.json` | KDJ + Supertrend scalp |
-| **Bollinger Squeeze** | `bollinger-squeeze.json` | BB squeeze breakout + MACD + ADX |
-| **Ichimoku Cloud** | `ichimoku-cloud.json` | Ichimoku cloud trend following |
-| **Chandelier Exit** | `chandelier-exit.json` | Chandelier exit + ADX trend filter |
 | **PMAX** | `pmax.json` | EMA + ATR-based Supertrend trend following |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX + volume confirmation |
 | **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover in Supertrend uptrend + ADX |
-| **ATR Trailing Vortex** | `atr-trailing-vortex.json` | Vortex crossover + ATR trailing stop + ADX + MACD |
 | **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery in Supertrend uptrend |
+| **Bollinger Squeeze** | `bollinger-squeeze.json` | BB squeeze breakout + MACD + ADX |
+| **Ichimoku Cloud** | `ichimoku-cloud.json` | Ichimoku cloud trend following |
 | **Fast Supertrend** | `fast-supertrend.json` | Fast Supertrend + RSI + ADX |
-| **Scalp RSI BB** | `scalp-rsi-bb.json` | BB mean reversion + RSI oversold + volume |
 | **VWAP Momentum** | `vwap-momentum.json` | VWAP-gated score mode momentum |
-| **Supertrend Flip** | `supertrend-flip.json` | Long/short Supertrend flip (2x leverage) |
-| **RSI Reversal** | `rsi-reversal.json` | RSI mean reversion long/short (2x) |
-| **MACD Crossover** | `macd-crossover.json` | MACD crossover long/short in trend (2x) |
-| **BB Mean Reversion** | `bb-mean-reversion.json` | BB long lower / short upper (2x) |
-| **Vortex Trend** | `vortex-trend.json` | Vortex VI+/VI- trend long/short (2x) |
 | **CCI Williams Momentum** | `cci-williams-momentum.json` | CCI zero-cross + Williams %R oversold + Supertrend |
 | **Hull Chop Momentum** | `hull-chop-momentum.json` | HMA trend + Choppiness filter + UO oversold dip |
-| **Fisher Pullback** | `fisher-pullback.json` | Fisher Transform + RSI + HMA trend pullback |
-| **Force Trend** | `force-trend.json` | Force Index zero-cross + ADX + Linear Regression Slope |
 | **VWMA Chop Breakout** | `vwma-chop-breakout.json` | VWMA/SMA divergence + Choppiness breakout |
 | **Coppock Bottom** | `coppock-bottom.json` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
+| **Aroon Trend Rider** | `aroon-trend-rider.json` | Aroon trend detection + RSI pullback + ADX filter |
+| **Keltner Breakout** | `keltner-breakout.json` | Keltner channel breakout + MACD + ADX |
+| **PSAR Momentum** | `psar-momentum.json` | Parabolic SAR + ROC momentum + RSI filter |
+| **Elder Impulse** | `elder-impulse.json` | Elder Ray bull/bear power + EMA trend + ADX |
+| **DPO RSI Pullback** | `dpo-rsi-pullback.json` | DPO cycle detection + RSI pullback + Supertrend |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories, no pattern matching. Each returns `Signal = 'buy' | 'sell' | 'short' | 'cover'`.
 

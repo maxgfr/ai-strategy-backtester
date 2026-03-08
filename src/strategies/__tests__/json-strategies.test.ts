@@ -22,10 +22,13 @@ describe('JSON strategies via registry', () => {
     expect(names).toContain('breakout-volume')
     expect(names).toContain('cci-williams-momentum')
     expect(names).toContain('hull-chop-momentum')
-    expect(names).toContain('fisher-pullback')
-    expect(names).toContain('force-trend')
     expect(names).toContain('vwma-chop-breakout')
     expect(names).toContain('coppock-bottom')
+    expect(names).toContain('aroon-trend-rider')
+    expect(names).toContain('keltner-breakout')
+    expect(names).toContain('psar-momentum')
+    expect(names).toContain('elder-impulse')
+    expect(names).toContain('dpo-rsi-pullback')
   })
 
   it('throws for unknown strategy', () => {
