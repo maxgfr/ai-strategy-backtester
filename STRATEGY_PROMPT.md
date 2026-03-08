@@ -406,13 +406,14 @@ These are common mistakes that produce bad strategies. Avoid them:
 
 These are proven insights from backtesting 20+ strategies on ETHUSDT 2022-2026:
 
-1. **Simple > Complex** — The best strategy (rsi-macd-trend-ride, 249% profit) has only 2 buy conditions and 1 sell condition. More conditions != better.
-2. **Rare signals win** — RSI < 35 + MACD histogram > 0 triggers only 9 trades in 4 years but catches exact market bottoms. Don't optimize for trade count.
-3. **Trend filter is essential** — In the 2022 bear market, most RSI-based strategies without Supertrend/EMA trend filter lost money.
-4. **ADX > 20 reduces noise** — Adding `["adx.adx", ">", 20]` removes signals in ranging/choppy markets.
-5. **6h often outperforms 4h** for long-term strategies — it filters out intraday whipsaws.
+1. **Trend following dominates** — The best strategy (trend-momentum-rider, +337%) is a simple trend follower with MACD filter. All top 5 performers are trend-following strategies, NOT bottom-pickers.
+2. **Simple > Complex** — trend-momentum-rider has 2 buy conditions and 1 sell condition. More conditions != better.
+3. **6h is the best timeframe** — 6h outperforms 4h consistently. 12h is also strong for slow strategies.
+4. **Shorts are destructive** — Nearly all strategies with short trades lose money. Avoid shorts unless you have a very specific edge.
+5. **ADX > 20 reduces noise** — Adding `["adx.adx", ">", 20]` removes signals in ranging/choppy markets.
 6. **Buy-the-dip in uptrend** is very effective — Supertrend UP + RSI pullback below 50 + MACD positive catches quality dips.
 7. **Sell conditions matter more than buy** — An overly tight sell (RSI > 60) kills a great entry. Let winners run.
+8. **Patient exits win** — Using a single Supertrend break or cloud bottom for exit outperforms multi-condition exits.
 
 ---
 
@@ -464,3 +465,37 @@ Use these as reference when setting condition thresholds:
 - Aroon Up/Down crossover — long when Up > Down, short when Down > Up (2x)
 - Fisher Transform — long oversold cross, short overbought cross (2x)
 - TRIX zero-cross — long above zero, short below zero with ADX (2x)
+
+---
+
+## Per-Strategy Config Parameters (set in `config.json`)
+
+These parameters are NOT part of the strategy JSON file. They are set in `config.json` under `strategies.<name>`:
+
+```json
+{
+  "strategies": {
+    "my-strategy": {
+      "timeframes": ["6h", "12h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15,
+      "max_drawdown_pct": 0.3,
+      "risk_per_trade": 0.02
+    }
+  }
+}
+```
+
+| Parameter | Range | Description |
+|---|---|---|
+| `timeframes` | BinanceInterval[] | **Required.** Timeframes to backtest. Valid: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w` |
+| `stop_loss_pct` | 0–1 | Stop loss: exit when price moves against entry by this %. `0.08` = 8%. Checked intra-candle (uses high/low) |
+| `trailing_stop_pct` | 0–1 | Trailing stop: exit when price retraces from peak (long) or trough (short) by this %. `0.12` = 12% retrace from peak |
+| `max_drawdown_pct` | 0–1 | Circuit breaker: permanently stop opening new positions when account drawdown exceeds this. `0.25` = 25% DD. Does NOT close existing positions |
+| `risk_per_trade` | 0–1 | Position sizing: invest `risk / stop_loss` fraction of capital per trade. Rest in reserve. **Requires `stop_loss_pct`**. `0.02` with SL=8% → 25% invested |
+
+**Key interactions:**
+- `stop_loss_pct` + `trailing_stop_pct` can coexist — whichever triggers first exits
+- `risk_per_trade` has no effect without `stop_loss_pct`
+- `max_drawdown_pct` is permanent once tripped — no more trades even if equity recovers
+- All stops execute with slippage and taker fee, before strategy signals are checked

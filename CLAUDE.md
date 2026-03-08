@@ -4,8 +4,10 @@
 
 **After every iteration that modifies code, verify that these files are still accurate:**
 1. **`CLAUDE.md`** — architecture, strategy list, indicator count, config fields
-2. **`README.md`** — strategy list, indicator count, feature descriptions
-3. **`STRATEGY_PROMPT.md`** — indicator tables, threshold reference, examples
+2. **`README.md`** — strategy list, indicator count, feature descriptions, config documentation
+3. **`STRATEGY_PROMPT.md`** — indicator tables, threshold reference, examples, JSON schema
+
+**Special attention to `STRATEGY_PROMPT.md`**: This file is the reference for AI strategy generation AND manual strategy creation. It must always reflect the current state of the catalog (all indicators with exact parameters and fields), the JSON schema, value reference syntax, and all examples. If an indicator is added/removed/modified in `catalog.ts`, update `STRATEGY_PROMPT.md` immediately.
 
 If files were added/removed, strategies changed, indicators added, config modified, commands updated, or architecture altered — update ALL THREE files immediately. An outdated doc causes compounding errors across sessions.
 
@@ -45,7 +47,8 @@ strategies/                          # ALL strategies as JSON (no TS strategies,
 ├── psar-momentum.json               # Parabolic SAR + ROC momentum + RSI
 ├── elder-impulse.json               # Elder Ray impulse + EMA trend + ADX
 ├── dpo-rsi-pullback.json            # DPO cycle + RSI pullback + close > Supertrend
-└── adaptive-momentum-reversal.json  # Asymmetric long/short: RSI+MACD bottoms, Supertrend+MACD+ADX shorts
+├── adaptive-momentum-reversal.json  # Asymmetric long/short: RSI+MACD bottoms, Supertrend+MACD+ADX shorts
+└── trend-momentum-rider.json        # Supertrend + MACD momentum, patient Supertrend exit ★ NEW CHAMPION
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
 ├── generate.ts             # CLI entry point for AI strategy generation
@@ -128,51 +131,108 @@ This is mandatory. All four must pass:
 
 ## Configuration (`config.json`)
 
-All configuration is externalized in `config.json` at the project root. Loaded by `src/config.ts` into an `AppConfig` object. **Flat format** — no nested `trading` or `simulation.profiles` wrappers.
+All configuration is externalized in `config.json` at the project root. Loaded by `src/config.ts` into an `AppConfig` object. Validated at startup via Zod (`src/schemas/config.ts`). **Flat format** — no nested `trading` or `simulation.profiles` wrappers.
 
 ### Top-Level Fields
 
-| Field | Default | Description |
-|---|---|---|
-| `fees` | `0.0026` | Trading fees (0.26%) — used as fallback when makerFee/takerFee not set |
-| `makerFee` | (= `fees`) | Maker fee for limit orders (entries: buy, short) |
-| `takerFee` | (= `fees`) | Taker fee for market orders (exits: sell, cover, stops) |
-| `fundingRate` | `0.0001` | Funding rate for perpetual futures (applied every 8h during open positions) |
-| `slippage` | `0.001` | Slippage per trade (0.1%). Buy/cover execute at `price*(1+slippage)`, sell/short at `price*(1-slippage)` |
-| `initialCapital` | `10000` | Starting capital |
-| `symbols` | `["ETHUSDT", "BTCUSDT", "SOLUSDT"]` | Trading pairs — simulation runs matrix across all |
-| `dates` | `[{"start": "2022-01-01", "end": "2026-02-01"}]` | Date ranges for backtesting |
+| Field | Required | Default | Range | Description |
+|---|---|---|---|---|
+| `fees` | **Yes** | — | 0–1 | Trading fees (e.g., `0.0026` = 0.26%) — used as fallback when `makerFee`/`takerFee` not set |
+| `makerFee` | No | = `fees` | 0–1 | Maker fee for limit orders (entries: buy, short). Overrides `fees` for entries |
+| `takerFee` | No | = `fees` | 0–1 | Taker fee for market orders (exits: sell, cover, stops, liquidations). Overrides `fees` for exits |
+| `fundingRate` | No | `0` | 0–0.01 | Funding rate for perpetual futures (applied every 8h crossing during open positions). `0.0001` = 0.01% per 8h period |
+| `slippage` | No | `0` | 0–0.1 | Slippage per trade. Buy/cover execute at `price*(1+slippage)`, sell/short at `price*(1-slippage)`. `0.001` = 0.1% |
+| `initialCapital` | **Yes** | — | > 0 | Starting capital for each simulation run |
+| `symbols` | **Yes** | — | string[] | Trading pairs (e.g., `["ETHUSDT", "SOLUSDT"]`). Simulation runs matrix across all symbols × strategies × timeframes |
+| `dates` | **Yes** | — | DateRange[] | Date ranges for backtesting. Each entry: `{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`. Special value `"now"` resolves to current date. Multiple ranges supported — each is backtested independently |
+
+**Valid timeframes (BinanceInterval):** `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`
 
 ### Per-Strategy Configuration
 
-Each strategy is configured individually under `strategies.<name>`:
+Each strategy is configured individually under `strategies.<name>`. The key must match the JSON strategy filename (without `.json`).
 
-| Field | Required | Description |
-|---|---|---|
-| `strategies.<name>.timeframes` | Yes | Timeframes to test (e.g., `["4h", "6h"]`) |
-| `strategies.<name>.stop_loss_pct` | No | Stop loss percentage (e.g., `0.08` = 8% from entry) |
-| `strategies.<name>.trailing_stop_pct` | No | Trailing stop percentage (e.g., `0.12` = 12% retrace from peak/trough) |
-| `strategies.<name>.max_drawdown_pct` | No | Circuit breaker: stop opening positions when drawdown exceeds threshold (e.g., `0.25` = 25%) |
-| `strategies.<name>.risk_per_trade` | No | Fractional position sizing: allocate `risk_per_trade / stop_loss_pct` of capital per trade (e.g., `0.02` = 2% risk) |
+| Field | Required | Default | Range | Description |
+|---|---|---|---|---|
+| `timeframes` | **Yes** | — | BinanceInterval[] | Timeframes to test (e.g., `["4h", "6h"]`). Each creates a separate simulation run |
+| `stop_loss_pct` | No | _(none)_ | 0–1 | Stop loss: exit when price moves against entry by this percentage. Long: exit if `price <= entry * (1 - SL)`. Short: exit if `price >= entry * (1 + SL)`. `0.08` = 8% from entry. Applied intra-candle (checks high/low) |
+| `trailing_stop_pct` | No | _(none)_ | 0–1 | Trailing stop: exit when price retraces from peak (long) or trough (short) by this percentage. Long: tracks highest price since entry, exits if `price <= peak * (1 - TS)`. Short: tracks lowest price since entry, exits if `price >= trough * (1 + TS)`. `0.12` = 12% retrace. Applied intra-candle |
+| `max_drawdown_pct` | No | _(none)_ | 0–1 | Circuit breaker: permanently stops opening new positions when account drawdown from equity peak exceeds this threshold. `0.25` = 25% drawdown. Once tripped, no new trades for the rest of the simulation. Only checked when flat (not during open positions). Existing positions are NOT closed |
+| `risk_per_trade` | No | _(none)_ | 0–1 | Fractional position sizing: only invest `min(1, risk_per_trade / stop_loss_pct)` of capital per trade. Remainder is held in reserve and re-added after exit. **Requires `stop_loss_pct` to be set** (ignored otherwise). `0.02` = risk 2% of capital per trade. With SL=8%: invests 25% of capital, reserves 75%. Reduces drawdown but also reduces gains |
+
+**Interaction between parameters:**
+- `stop_loss_pct` + `trailing_stop_pct` can both be active — whichever triggers first exits the position
+- `risk_per_trade` needs `stop_loss_pct > 0` to compute the fraction; without SL it has no effect
+- `max_drawdown_pct` is cumulative across all trades — once tripped, the strategy stops trading even if equity recovers
+- Stop loss and trailing stop are checked **before** strategy signals each candle — they take priority over strategy exits
+- All stops execute with slippage and taker fee
 
 ### Walk-Forward Validation
 
-| Field | Default | Description |
-|---|---|---|
-| `walkForward.enabled` | `false` | Enable walk-forward train/test split |
-| `walkForward.trainRatio` | `0.7` | Fraction of each date range used for training (0.1–0.9). Remainder is test period |
+| Field | Required | Default | Range | Description |
+|---|---|---|---|---|
+| `walkForward.enabled` | Yes (if block present) | `false` | boolean | Enable walk-forward train/test split. When enabled, each date range is split into train and test periods. Only test period results are kept |
+| `walkForward.trainRatio` | Yes (if block present) | `0.7` | 0.1–0.9 | Fraction of each date range used for training. `0.7` = first 70% is train, last 30% is test. Test period results only are saved |
 
 **`maxArraySize`** is computed dynamically per interval via `maxArraySizeForInterval()`: `max(1000, round(1000 * 240 / intervalMinutes))`. Shorter timeframes get proportionally more candles.
 
 ### Generation (AI Strategy Generation)
 
-| Field | Default | Description |
-|---|---|---|
-| `generation.enabled` | `false` | Enable/disable AI strategy generation |
-| `generation.model` | `mistral-small-latest` | OpenAI-compatible model |
-| `generation.baseUrl` | `https://api.mistral.ai/v1` | API endpoint (OpenAI-compatible) |
-| `generation.maxTokens` | `4096` | Max tokens |
-| `generation.temperature` | `0.7` | Temperature |
+| Field | Required | Default | Range | Description |
+|---|---|---|---|---|
+| `generation.enabled` | Yes (if block present) | `false` | boolean | Enable/disable AI strategy generation via `pnpm generate-strategy` |
+| `generation.model` | Yes (if block present) | `mistral-small-latest` | string | OpenAI-compatible model name |
+| `generation.baseUrl` | Yes (if block present) | `https://api.mistral.ai/v1` | URL | API endpoint (must be OpenAI-compatible) |
+| `generation.maxTokens` | Yes (if block present) | `4096` | > 0 (int) | Max tokens for strategy generation response |
+| `generation.temperature` | Yes (if block present) | `0.7` | 0–2 | Model temperature (higher = more creative/random strategies) |
+
+### Paths
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `paths.dbFolder` | **Yes** | `"db"` | Directory for simulation results. Each run creates `{dbFolder}/{runId}/` |
+| `paths.dbFile` | **Yes** | `"data"` | Base filename for result JSON files (mostly unused, kept for legacy) |
+| `paths.logFile` | **Yes** | `"all.log"` | Winston log file name |
+
+### Complete Config Example
+
+```json
+{
+  "fees": 0.0026,
+  "makerFee": 0.001,
+  "takerFee": 0.003,
+  "fundingRate": 0.0001,
+  "slippage": 0.001,
+  "initialCapital": 10000,
+  "symbols": ["ETHUSDT", "SOLUSDT"],
+  "dates": [
+    { "start": "2022-01-01", "end": "2026-02-01" },
+    { "start": "2024-01-01", "end": "now" }
+  ],
+  "strategies": {
+    "trend-momentum-rider": {
+      "timeframes": ["6h", "12h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15,
+      "max_drawdown_pct": 0.3,
+      "risk_per_trade": 0.02
+    }
+  },
+  "walkForward": { "enabled": true, "trainRatio": 0.7 },
+  "generation": {
+    "enabled": true,
+    "model": "mistral-small-latest",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "maxTokens": 4096,
+    "temperature": 0.7
+  },
+  "paths": {
+    "dbFolder": "db",
+    "dbFile": "data",
+    "logFile": "all.log"
+  }
+}
+```
 
 ---
 
@@ -217,6 +277,7 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Elder Impulse** | `elder-impulse.json` | Elder Ray bull/bear power + EMA trend + ADX |
 | **DPO RSI Pullback** | `dpo-rsi-pullback.json` | DPO cycle detection + RSI pullback + close > Supertrend |
 | **Adaptive Momentum Reversal** | `adaptive-momentum-reversal.json` | Asymmetric long/short: contrarian RSI+MACD bottoms + trend-following Supertrend+MACD+ADX shorts |
+| **Trend Momentum Rider** | `trend-momentum-rider.json` | Supertrend + MACD momentum filter, patient Supertrend-only exit ★ NEW CHAMPION |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories, no pattern matching. Each returns `Signal = 'buy' | 'sell' | 'short' | 'cover'`.
 

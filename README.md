@@ -50,7 +50,7 @@ pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-trend-ride
 
 All strategies live as `.json` files in `strategies/`. They are auto-discovered on each run. No prefix conventions — all names are plain kebab-case.
 
-### Available Strategies (23)
+### Available Strategies (24)
 
 | Strategy | Description |
 |----------|-------------|
@@ -77,6 +77,7 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `elder-impulse` | Elder Ray bull/bear power + EMA trend + ADX |
 | `dpo-rsi-pullback` | DPO cycle detection + RSI pullback + close > Supertrend |
 | `adaptive-momentum-reversal` | Asymmetric long/short: RSI+MACD bottoms + Supertrend+MACD+ADX shorts |
+| `trend-momentum-rider` | Supertrend + MACD momentum filter, patient Supertrend-only exit (top performer) |
 
 ### Creating a Strategy
 
@@ -132,30 +133,77 @@ pnpm generate-strategy "Buy when RSI is oversold and volume spikes above average
 
 ## Configuration
 
-All settings in `config.json` with a flat format:
+All settings in `config.json` with a flat format. Validated at startup via Zod.
 
-- **`fees`** — trading fees (default 0.26%), fallback when makerFee/takerFee not set
-- **`makerFee`** / **`takerFee`** — optional separate maker (entries) / taker (exits) fees
-- **`fundingRate`** — perpetual futures funding rate (applied every 8h, default 0.01%)
-- **`slippage`** — slippage per trade (default 0.1%)
-- **`initialCapital`** — starting capital
-- **`symbols`** — trading pairs to backtest across
-- **`dates`** — date ranges for backtesting
-- **`strategies.<name>`** — per-strategy timeframes, stop loss, trailing stop, circuit breaker, risk-per-trade
-- **`walkForward`** — optional train/test date split (`enabled`, `trainRatio`)
+### Top-Level Fields
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `fees` | Yes | — | Trading fees (e.g., `0.0026` = 0.26%). Fallback when `makerFee`/`takerFee` not set |
+| `makerFee` | No | = `fees` | Maker fee for entries (buy, short). Overrides `fees` for limit orders |
+| `takerFee` | No | = `fees` | Taker fee for exits (sell, cover, stops). Overrides `fees` for market orders |
+| `fundingRate` | No | `0` | Perpetual futures funding rate, applied every 8h during open positions. `0.0001` = 0.01% |
+| `slippage` | No | `0` | Slippage per trade. Buy/cover at `price*(1+slippage)`, sell/short at `price*(1-slippage)`. `0.001` = 0.1% |
+| `initialCapital` | Yes | — | Starting capital for each simulation run |
+| `symbols` | Yes | — | Trading pairs array (e.g., `["ETHUSDT", "SOLUSDT"]`). Matrix across all strategies |
+| `dates` | Yes | — | Date ranges: `[{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}]`. Special value `"now"` = current date |
+
+**Valid timeframes:** `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`
+
+### Per-Strategy Configuration (`strategies.<name>`)
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `timeframes` | Yes | — | Timeframes to test (e.g., `["4h", "6h"]`) |
+| `stop_loss_pct` | No | _(none)_ | Stop loss: exit when price moves against entry by this %. `0.08` = 8%. Checked intra-candle |
+| `trailing_stop_pct` | No | _(none)_ | Trailing stop: exit when price retraces from peak/trough by this %. `0.12` = 12% retrace |
+| `max_drawdown_pct` | No | _(none)_ | Circuit breaker: permanently stop opening new positions when drawdown exceeds threshold. `0.25` = 25%. Existing positions are NOT closed |
+| `risk_per_trade` | No | _(none)_ | Fractional position sizing: invest `risk_per_trade / stop_loss_pct` of capital per trade. Remainder in reserve. **Requires `stop_loss_pct`**. `0.02` with SL=8% → 25% invested, 75% reserved |
+
+**Parameter interactions:**
+- `stop_loss_pct` + `trailing_stop_pct` can coexist — whichever triggers first exits
+- `risk_per_trade` has no effect without `stop_loss_pct`
+- `max_drawdown_pct` is cumulative — once tripped, no more trades even if equity recovers
+- Stops are checked before strategy signals each candle and execute with slippage + taker fee
+
+### Other Sections
+
+| Section | Fields | Description |
+|---|---|---|
+| `walkForward` | `enabled` (bool), `trainRatio` (0.1–0.9) | Train/test date split. Only test period results are kept |
+| `generation` | `enabled`, `model`, `baseUrl`, `maxTokens`, `temperature` (0–2) | AI strategy generation via `pnpm generate-strategy` |
+| `paths` | `dbFolder`, `dbFile`, `logFile` | Output directories for results, data, and logs |
+
+### Complete Example
 
 ```json
 {
+  "fees": 0.0026,
+  "makerFee": 0.001,
+  "takerFee": 0.003,
+  "fundingRate": 0.0001,
+  "slippage": 0.001,
+  "initialCapital": 10000,
+  "symbols": ["ETHUSDT", "SOLUSDT"],
+  "dates": [{ "start": "2022-01-01", "end": "now" }],
   "strategies": {
-    "rsi-macd-trend-ride": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12,
-      "max_drawdown_pct": 0.25,
+    "trend-momentum-rider": {
+      "timeframes": ["6h", "12h"],
+      "stop_loss_pct": 0.1,
+      "trailing_stop_pct": 0.15,
+      "max_drawdown_pct": 0.3,
       "risk_per_trade": 0.02
     }
   },
-  "walkForward": { "enabled": true, "trainRatio": 0.7 }
+  "walkForward": { "enabled": true, "trainRatio": 0.7 },
+  "generation": {
+    "enabled": false,
+    "model": "mistral-small-latest",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "maxTokens": 4096,
+    "temperature": 0.7
+  },
+  "paths": { "dbFolder": "db", "dbFile": "data", "logFile": "all.log" }
 }
 ```
 
