@@ -134,7 +134,9 @@ All configuration is externalized in `config.json` at the project root. Loaded b
 
 | Field | Default | Description |
 |---|---|---|
-| `fees` | `0.0026` | Trading fees (0.26%) |
+| `fees` | `0.0026` | Trading fees (0.26%) — used as fallback when makerFee/takerFee not set |
+| `makerFee` | (= `fees`) | Maker fee for limit orders (entries: buy, short) |
+| `takerFee` | (= `fees`) | Taker fee for market orders (exits: sell, cover, stops) |
 | `fundingRate` | `0.0001` | Funding rate for perpetual futures (applied every 8h during open positions) |
 | `slippage` | `0.001` | Slippage per trade (0.1%). Buy/cover execute at `price*(1+slippage)`, sell/short at `price*(1-slippage)` |
 | `initialCapital` | `10000` | Starting capital |
@@ -150,6 +152,15 @@ Each strategy is configured individually under `strategies.<name>`:
 | `strategies.<name>.timeframes` | Yes | Timeframes to test (e.g., `["4h", "6h"]`) |
 | `strategies.<name>.stop_loss_pct` | No | Stop loss percentage (e.g., `0.08` = 8% from entry) |
 | `strategies.<name>.trailing_stop_pct` | No | Trailing stop percentage (e.g., `0.12` = 12% retrace from peak/trough) |
+| `strategies.<name>.max_drawdown_pct` | No | Circuit breaker: stop opening positions when drawdown exceeds threshold (e.g., `0.25` = 25%) |
+| `strategies.<name>.risk_per_trade` | No | Fractional position sizing: allocate `risk_per_trade / stop_loss_pct` of capital per trade (e.g., `0.02` = 2% risk) |
+
+### Walk-Forward Validation
+
+| Field | Default | Description |
+|---|---|---|
+| `walkForward.enabled` | `false` | Enable walk-forward train/test split |
+| `walkForward.trainRatio` | `0.7` | Fraction of each date range used for training (0.1–0.9). Remainder is test period |
 
 **`maxArraySize`** is computed dynamically per interval via `maxArraySizeForInterval()`: `max(1000, round(1000 * 240 / intervalMinutes))`. Shorter timeframes get proportionally more candles.
 
@@ -248,19 +259,22 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 
 - **Single backtest**: `pnpm backtest PAIR INTERVAL START END STRATEGY` — runs in main process
 - **Full matrix**: `pnpm backtest` (no args) — iterates over `config.strategies` map, crosses each strategy's `timeframes` with `symbols` and `dates`, dispatches to a worker pool (`child_process.fork()`) with concurrency = CPU core count
-- Each worker receives `maxArraySize` computed dynamically from interval, plus per-strategy `stop_loss_pct` and `trailing_stop_pct`
+- Each worker receives `maxArraySize` computed dynamically from interval, plus per-strategy `stop_loss_pct`, `trailing_stop_pct`, `max_drawdown_pct`, `risk_per_trade`
 - Each run creates `db/{runId}/` with results as `{pair}_{interval}_{strategy}_{start}_{end}.json`
 - `runId` is an auto-generated timestamp (`YYYYMMDD_HHmmss`) — concurrent runs never collide
-- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, slippage, separate long/short trade metrics, Buy & Hold benchmark (alpha), drawdown duration analysis, MAE/MFE tracking, statistical significance (t-test), Monte Carlo simulation (1000 iterations)
+- **Simulation features**: funding fees (8h periods, erodes margin for liquidation), liquidation detection (intra-candle via high/low, accounts for funding), stop loss, trailing stop, slippage, maker/taker fee split, circuit breaker (drawdown-based), risk-per-trade position sizing (with reserve capital), separate long/short trade metrics, Buy & Hold benchmark (alpha), drawdown duration analysis, MAE/MFE tracking (including on liquidations), statistical significance (t-test), Monte Carlo simulation (1000 iterations, percentage-based returns), sensitivity analysis (fees 2x / slippage 2x impact)
+- **Walk-forward validation**: optional train/test date split via `walkForward.trainRatio` — each date range is split, only test period results are kept
+- **Data validation**: candles validated on fetch and cache read (NaN, non-positive prices, OHLC consistency, duplicate/out-of-order timestamps filtered)
+- **Metrics**: Sharpe (annualized), Sortino (downside-only denominator), Calmar (uses peak at max drawdown), Recovery Factor, Expectancy, MAE/MFE ratio, max consecutive wins/losses, long/short breakdown, funding paid, sensitivity (returnIfFees2x, returnIfSlippage2x)
 - Report generated as `reports/report_<timestamp>.html` (unique per run, no overwrite) with:
   - **Category comparison cards** (best Long-Only vs best Shorting side by side, with benchmark comparison)
   - **Filter buttons** (All / Long-Only / Shorting) to toggle rankings and averages tables
   - **Category badges**: Long-Only (green), Shorting (purple)
   - Classification is data-driven: `shortTrades > 0` = Shorting, else Long-Only
-  - **Rankings table**: Strategy Return, Buy & Hold, Alpha, Significant columns
+  - **Rankings table**: Strategy Return, Buy & Hold, Alpha, Calmar, Significant columns
   - **Equity curve** (gold line) overlaid on chart modal
-  - **Modal details**: MAE/MFE, Monte Carlo range, ruin probability
-  - Chart markers: purple arrows for SHORT entries, labels distinguish SELL vs COVER on exits
+  - **Modal details**: Calmar, DD duration, MAE/MFE + ratio, consecutive wins/losses, long/short breakdown, funding paid, Monte Carlo range, ruin probability, sensitivity analysis
+  - Chart markers: purple arrows for SHORT entries, red for SELL, orange for COVER
 
 ---
 
@@ -281,9 +295,10 @@ type DbSchema = { version, initialParameters, historicPosition, position, ...met
                   maxDrawdownDuration?, avgDrawdownDuration?, timeToRecovery?,
                   avgMAE?, avgMFE?, maeToMfeRatio?,
                   tStatistic?, pValue?, isSignificant?,
-                  monteCarloMedian?, monteCarlo5th?, monteCarlo95th?, ruinProbability? }
-type StrategyConfig = { timeframes, stop_loss_pct?, trailing_stop_pct? }  // in config.ts
-type AppConfig = { fees, fundingRate, slippage, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, paths }
+                  monteCarloMedian?, monteCarlo5th?, monteCarlo95th?, ruinProbability?,
+                  feesPerTrade?, totalFeesEstimate?, returnIfFees2x?, returnIfSlippage2x? }
+type StrategyConfig = { timeframes, stop_loss_pct?, trailing_stop_pct?, max_drawdown_pct?, risk_per_trade? }  // in config.ts
+type AppConfig = { fees, makerFee, takerFee, fundingRate, slippage, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, walkForward?, paths }
 ```
 
 ---
@@ -310,6 +325,12 @@ When creating or reviewing strategies, apply these proven insights:
 - **Buy-the-dip in uptrend**: Supertrend UP + RSI pullback + MACD positive.
 - **Let winners run**: tight sell conditions kill great entries.
 
+### Overfitting Warning
+- **No walk-forward / out-of-sample framework**: all backtests run on the full date range. If you tune `stop_loss_pct`, `trailing_stop_pct`, or indicator parameters to maximize returns on a single period, results will be overfit and likely fail on new data.
+- **Mitigation**: always validate promising strategies on a **different date range or symbol** before trusting the results. For example, optimize on 2022-2024, validate on 2024-2026.
+- **Multiple comparison risk**: testing 23 strategies × multiple timeframes produces ~100+ results. Some will look good by chance. Look for strategies that are significant (`pValue < 0.05`) AND have a logical edge — not just high returns.
+- **Timeframe auto-scaling reduces overfitting**: indicator periods are not tuned per timeframe, which forces generalization. This is a deliberate design choice.
+
 ### Threshold Quick Reference
 | Indicator | Oversold | Overbought | Trending |
 |-----------|----------|------------|----------|
@@ -332,6 +353,8 @@ When creating or reviewing strategies, apply these proven insights:
 - **No `console.log`**: use `logger` from `./logger` (winston)
 - **Database** is a plain `fs.readFileSync`/`writeFileSync` JSON store (`src/database.ts`), no external DB dependency
 - **Data fetching** uses `binance-historical` package to download OHLCV klines
+- **Data validation** (`src/data.ts`): candles validated on fetch and cache read — NaN/non-positive prices skipped, OHLC consistency auto-fixed, duplicate/out-of-order timestamps filtered
+- **NaN guard in strategy engine**: condition evaluation rejects NaN values explicitly (prevents silent false evaluations)
 - **Validation**: Config validated at startup via Zod (`src/schemas/config.ts`). Strategy JSON validated structurally via Zod (`src/schemas/strategy.ts`) + semantically in `engine.ts` (catalog existence, field resolution)
 
 ### Code Quality Rules (Biome-enforced)

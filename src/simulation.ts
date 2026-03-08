@@ -37,6 +37,8 @@ type WorkerData = {
   dbPath: string
   stopLossPct?: number
   trailingStopPct?: number
+  maxDrawdownPct?: number
+  riskPerTrade?: number
 }
 
 function countFundingPeriods(prevTimeSec: number, currTimeSec: number): number {
@@ -216,7 +218,11 @@ function computeAdvancedMetrics(
       : downsideReturns.reduce((s, p) => s + p ** 2, 0) / downsideReturns.length
   const downsideDev = Math.sqrt(downsideVariance)
   const sortino =
-    downsideDev === 0 ? 0 : round((mean / downsideDev) * annualizationFactor)
+    downsideDev === 0
+      ? mean > 0
+        ? 9999
+        : 0
+      : round((mean / downsideDev) * annualizationFactor)
 
   // Total return for Calmar/Recovery
   const finalCapital = db.get('position').capital
@@ -224,7 +230,8 @@ function computeAdvancedMetrics(
 
   // Calmar Ratio: annualized return / max drawdown (dollar from the peak that produced it)
   const maxDrawdownDollar = maxDrawdown * maxDrawdownPeak
-  const annualizedReturn = totalReturn / backtestYears
+  const annualizedReturn =
+    backtestYears > 0 ? totalReturn / backtestYears : totalReturn
   const calmarRatio =
     maxDrawdownDollar === 0 ? 0 : round(annualizedReturn / maxDrawdownDollar)
 
@@ -293,8 +300,12 @@ type SimulationOptions = {
   leverage: number
   stopLossPct?: number
   trailingStopPct?: number
+  maxDrawdownPct?: number
+  riskPerTrade?: number
   fundingRate: number
   slippage: number
+  makerFee: number
+  takerFee: number
 }
 
 async function simulation(
@@ -317,8 +328,18 @@ async function simulation(
     `data/${pair}_${interval}_${formatDate(startDate)}_${formatDate(endDate)}.json`,
   )
 
-  const { fees, initialCapital } = config
-  const { leverage, stopLossPct, trailingStopPct, fundingRate, slippage } = opts
+  const { initialCapital } = config
+  const {
+    leverage,
+    stopLossPct,
+    trailingStopPct,
+    maxDrawdownPct,
+    riskPerTrade,
+    fundingRate,
+    slippage,
+    makerFee,
+    takerFee,
+  } = opts
   const window: CandleStick[] = []
 
   let peakPrice = 0
@@ -326,6 +347,13 @@ async function simulation(
   let accumulatedFunding = 0
   let totalFundingPaid = 0
   let prevTime = 0
+
+  // Circuit breaker: stop opening new positions after max drawdown
+  let equityPeak = initialCapital
+  let circuitBreakerTripped = false
+
+  // Risk-per-trade: reserve capital not invested
+  let reserveCapital = 0
 
   // MAE/MFE tracking per trade
   let tradeEntryPrice = 0
@@ -341,7 +369,7 @@ async function simulation(
     const date = new Date(candle.time * 1000)
 
     if (i === 0) {
-      const initialAssets = (initialCapital - initialCapital * fees) / price
+      const initialAssets = (initialCapital - initialCapital * makerFee) / price
       db.set('initialCapital', initialCapital)
       db.set('position', {
         date: '',
@@ -376,20 +404,34 @@ async function simulation(
     }
     prevTime = candle.time
 
-    // === Liquidation check (leverage only) ===
+    // === MAE/MFE tracking (before liquidation/stops so final candle is captured) ===
+    if (tradeType === 'buy' && tradeEntryPrice > 0) {
+      const pctMove = (price - tradeEntryPrice) / tradeEntryPrice
+      if (pctMove < tradeMAE) tradeMAE = pctMove
+      if (pctMove > tradeMFE) tradeMFE = pctMove
+    } else if (tradeType === 'short' && tradeEntryPrice > 0) {
+      const pctMove = (tradeEntryPrice - price) / tradeEntryPrice
+      if (pctMove < tradeMAE) tradeMAE = pctMove
+      if (pctMove > tradeMFE) tradeMFE = pctMove
+    }
+
+    // === Liquidation check (leverage only, funding erodes margin) ===
     if (leverage > 1 && lastPosition.type === 'buy') {
-      // Long liquidation: price <= entry * (1 - 1/leverage)
-      const liqPrice = lastPosition.price * (1 - 1 / leverage)
+      const effectiveMargin = lastPosition.capital - accumulatedFunding
+      const liqPrice =
+        effectiveMargin > 0
+          ? lastPosition.price *
+            (1 - effectiveMargin / (lastPosition.capital * leverage))
+          : lastPosition.price // margin already depleted by funding
       if (candle.low <= liqPrice) {
-        // Liquidated — capital = 0, include accumulated funding in loss
-        const totalLoss = lastPosition.capital + accumulatedFunding
+        const liqCapital = reserveCapital // invested capital lost, reserve preserved
         const position = {
           date: date.toISOString(),
           type: 'sell' as const,
           price: liqPrice,
-          capital: 0,
+          capital: liqCapital,
           assets: 0,
-          tradeProfit: -totalLoss,
+          tradeProfit: -lastPosition.capital,
         }
         db.set('position', position)
         db.push('historicPosition', position)
@@ -398,23 +440,28 @@ async function simulation(
           mfeValues.push(tradeMFE)
           tradeType = null
         }
+        reserveCapital = 0
         peakPrice = 0
         accumulatedFunding = 0
         continue
       }
     }
     if (leverage > 1 && lastPosition.type === 'short') {
-      // Short liquidation: price >= entry * (1 + 1/leverage)
-      const liqPrice = lastPosition.price * (1 + 1 / leverage)
-      if (candle.high >= liqPrice) {
-        const totalLoss = lastPosition.capital + accumulatedFunding
+      const effectiveMarginShort = lastPosition.capital - accumulatedFunding
+      const liqPriceShort =
+        effectiveMarginShort > 0
+          ? lastPosition.price *
+            (1 + effectiveMarginShort / (lastPosition.capital * leverage))
+          : lastPosition.price
+      if (candle.high >= liqPriceShort) {
+        const liqCapitalShort = reserveCapital
         const position = {
           date: date.toISOString(),
           type: 'sell' as const,
-          price: liqPrice,
-          capital: 0,
+          price: liqPriceShort,
+          capital: liqCapitalShort,
           assets: 0,
-          tradeProfit: -totalLoss,
+          tradeProfit: -lastPosition.capital,
         }
         db.set('position', position)
         db.push('historicPosition', position)
@@ -423,16 +470,36 @@ async function simulation(
           mfeValues.push(tradeMFE)
           tradeType = null
         }
+        reserveCapital = 0
         troughPrice = Number.POSITIVE_INFINITY
         accumulatedFunding = 0
         continue
       }
     }
 
-    // === Stop loss check ===
+    // === Stop loss check (apply slippage to execution price) ===
     if (stopLossPct !== undefined && lastPosition.type === 'buy') {
       if (price <= lastPosition.price * (1 - stopLossPct)) {
-        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        const slippedPrice = price * (1 - slippage)
+        executeSell(
+          slippedPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
+        // Add reserve back after exit
+        if (reserveCapital > 0) {
+          const pos = db.get('position')
+          db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+          reserveCapital = 0
+        }
         peakPrice = 0
         accumulatedFunding = 0
         continue
@@ -440,14 +507,32 @@ async function simulation(
     }
     if (stopLossPct !== undefined && lastPosition.type === 'short') {
       if (price >= lastPosition.price * (1 + stopLossPct)) {
-        executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        const slippedPrice = price * (1 + slippage)
+        executeCover(
+          slippedPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
+        if (reserveCapital > 0) {
+          const pos = db.get('position')
+          db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+          reserveCapital = 0
+        }
         troughPrice = Number.POSITIVE_INFINITY
         accumulatedFunding = 0
         continue
       }
     }
 
-    // === Trailing stop check ===
+    // === Trailing stop check (apply slippage to execution price) ===
     if (lastPosition.type === 'buy') {
       if (price > peakPrice) peakPrice = price
       if (
@@ -455,7 +540,25 @@ async function simulation(
         peakPrice > 0 &&
         price <= peakPrice * (1 - trailingStopPct)
       ) {
-        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        const slippedPrice = price * (1 - slippage)
+        executeSell(
+          slippedPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
+        if (reserveCapital > 0) {
+          const pos = db.get('position')
+          db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+          reserveCapital = 0
+        }
         peakPrice = 0
         accumulatedFunding = 0
         continue
@@ -468,30 +571,65 @@ async function simulation(
         troughPrice < Number.POSITIVE_INFINITY &&
         price >= troughPrice * (1 + trailingStopPct)
       ) {
-        executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        const slippedPrice = price * (1 + slippage)
+        executeCover(
+          slippedPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
+        if (reserveCapital > 0) {
+          const pos = db.get('position')
+          db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+          reserveCapital = 0
+        }
         troughPrice = Number.POSITIVE_INFINITY
         accumulatedFunding = 0
         continue
       }
     }
 
-    // === MAE/MFE tracking ===
-    if (tradeType === 'buy' && tradeEntryPrice > 0) {
-      const pctMove = (price - tradeEntryPrice) / tradeEntryPrice
-      if (pctMove < tradeMAE) tradeMAE = pctMove
-      if (pctMove > tradeMFE) tradeMFE = pctMove
-    } else if (tradeType === 'short' && tradeEntryPrice > 0) {
-      const pctMove = (tradeEntryPrice - price) / tradeEntryPrice
-      if (pctMove < tradeMAE) tradeMAE = pctMove
-      if (pctMove > tradeMFE) tradeMFE = pctMove
+    // === Circuit breaker: track equity and stop opening new positions ===
+    if (maxDrawdownPct !== undefined && lastPosition.type === 'sell') {
+      const currentEquity = lastPosition.capital + reserveCapital
+      if (currentEquity > equityPeak) equityPeak = currentEquity
+      if (
+        equityPeak > 0 &&
+        (equityPeak - currentEquity) / equityPeak >= maxDrawdownPct
+      ) {
+        circuitBreakerTripped = true
+      }
     }
 
     // === Strategy signal ===
     const signal = strategy(dataWindow, lastPosition.type)
 
-    if (signal === 'buy' && lastPosition.type !== 'buy') {
+    if (
+      signal === 'buy' &&
+      lastPosition.type !== 'buy' &&
+      !circuitBreakerTripped
+    ) {
       const buyPrice = price * (1 + slippage)
-      executeBuy(buyPrice, date, db, fees, leverage)
+      // Risk-per-trade: only invest a fraction of capital
+      if (
+        riskPerTrade !== undefined &&
+        stopLossPct !== undefined &&
+        stopLossPct > 0
+      ) {
+        const fraction = Math.min(1, riskPerTrade / stopLossPct)
+        const totalCapital = lastPosition.capital
+        const investCapital = totalCapital * fraction
+        reserveCapital = totalCapital - investCapital
+        db.set('position', { ...lastPosition, capital: investCapital })
+      }
+      executeBuy(buyPrice, date, db, makerFee, leverage)
       peakPrice = buyPrice
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
@@ -505,13 +643,35 @@ async function simulation(
         mfeValues.push(tradeMFE)
       }
       const sellPrice = price * (1 - slippage)
-      executeSell(sellPrice, date, db, fees, leverage, accumulatedFunding)
+      executeSell(sellPrice, date, db, takerFee, leverage, accumulatedFunding)
+      // Add reserve back after exit
+      if (reserveCapital > 0) {
+        const pos = db.get('position')
+        db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+        reserveCapital = 0
+      }
       peakPrice = 0
       accumulatedFunding = 0
       tradeType = null
-    } else if (signal === 'short' && lastPosition.type !== 'short') {
+    } else if (
+      signal === 'short' &&
+      lastPosition.type !== 'short' &&
+      !circuitBreakerTripped
+    ) {
       const shortPrice = price * (1 - slippage)
-      executeShort(shortPrice, date, db, fees, leverage)
+      // Risk-per-trade for shorts
+      if (
+        riskPerTrade !== undefined &&
+        stopLossPct !== undefined &&
+        stopLossPct > 0
+      ) {
+        const fraction = Math.min(1, riskPerTrade / stopLossPct)
+        const totalCapital = lastPosition.capital
+        const investCapital = totalCapital * fraction
+        reserveCapital = totalCapital - investCapital
+        db.set('position', { ...lastPosition, capital: investCapital })
+      }
+      executeShort(shortPrice, date, db, makerFee, leverage)
       troughPrice = shortPrice
       peakPrice = 0
       accumulatedFunding = 0
@@ -525,7 +685,12 @@ async function simulation(
         mfeValues.push(tradeMFE)
       }
       const coverPrice = price * (1 + slippage)
-      executeCover(coverPrice, date, db, fees, leverage, accumulatedFunding)
+      executeCover(coverPrice, date, db, takerFee, leverage, accumulatedFunding)
+      if (reserveCapital > 0) {
+        const pos = db.get('position')
+        db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+        reserveCapital = 0
+      }
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
       tradeType = null
@@ -539,19 +704,42 @@ async function simulation(
           maeValues.push(tradeMAE)
           mfeValues.push(tradeMFE)
         }
-        executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        const finalSellPrice = price * (1 - slippage)
+        executeSell(
+          finalSellPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
         tradeType = null
       } else if (finalType === 'short') {
         if (tradeType !== null) {
           maeValues.push(tradeMAE)
           mfeValues.push(tradeMFE)
         }
-        executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        const finalCoverPrice = price * (1 + slippage)
+        executeCover(
+          finalCoverPrice,
+          date,
+          db,
+          takerFee,
+          leverage,
+          accumulatedFunding,
+        )
         tradeType = null
+      }
+      // Add any remaining reserve
+      if (reserveCapital > 0) {
+        const pos = db.get('position')
+        db.set('position', { ...pos, capital: pos.capital + reserveCapital })
+        reserveCapital = 0
       }
       const finalPosition = db.get('position')
       const hodlAssets = db.get('hodlAssets') ?? 0
-      const hodlMoney = hodlAssets * price
+      const hodlGross = hodlAssets * price
+      const hodlMoney = hodlGross - hodlGross * takerFee
 
       // Buy & Hold benchmark
       const buyAndHoldReturn = round(hodlMoney - initialCapital)
@@ -607,6 +795,22 @@ async function simulation(
       db.set('maeToMfeRatio', maeToMfeRatio)
 
       computeTradeStats(db)
+
+      // Sensitivity analysis: estimate impact of doubling fees/slippage
+      const nbClosedTrades = db.get('closePosition') ?? 0
+      const avgFee = (makerFee + takerFee) / 2
+      const feesPerTrade = round(avgFee * initialCapital * 2, 4) // entry + exit
+      const totalFeesEstimate = round(nbClosedTrades * feesPerTrade)
+      const returnIfFees2x = round(strategyReturn - totalFeesEstimate)
+      const slippageCostPerTrade = slippage * initialCapital * 2
+      const returnIfSlippage2x = round(
+        strategyReturn - nbClosedTrades * slippageCostPerTrade,
+      )
+      db.set('feesPerTrade', feesPerTrade)
+      db.set('totalFeesEstimate', totalFeesEstimate)
+      db.set('returnIfFees2x', returnIfFees2x)
+      db.set('returnIfSlippage2x', returnIfSlippage2x)
+
       const backtestDays =
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       computeAdvancedMetrics(db, initialCapital, backtestDays)
@@ -640,8 +844,12 @@ export async function runSingleSimulation(
       leverage,
       stopLossPct: strategyConfig?.stop_loss_pct,
       trailingStopPct: strategyConfig?.trailing_stop_pct,
+      maxDrawdownPct: strategyConfig?.max_drawdown_pct,
+      riskPerTrade: strategyConfig?.risk_per_trade,
       fundingRate: config.fundingRate,
       slippage: config.slippage,
+      makerFee: config.makerFee,
+      takerFee: config.takerFee,
     },
   )
 }
@@ -745,26 +953,51 @@ export async function runSimulation(
       `Backtest ${strategyName} (${params.pair} ${params.interval}) completed in ${singleElapsed}s`,
     )
   } else {
-    const { symbols, dates, strategies } = config
+    const { symbols, dates, strategies, walkForward } = config
     const allCombinations: WorkerData[] = []
     const uniqueData = new Map<
       string,
       { interval: BinanceInterval; pair: string; start: Date; end: Date }
     >()
 
+    // Walk-forward: split each date range into train/test periods
+    const effectiveDates = walkForward?.enabled
+      ? dates.flatMap((d) => {
+          const totalMs = d.end.getTime() - d.start.getTime()
+          const splitMs = d.start.getTime() + totalMs * walkForward.trainRatio
+          const splitDate = new Date(splitMs)
+          return [
+            { start: d.start, end: splitDate },
+            { start: splitDate, end: d.end },
+          ]
+        })
+      : dates
+
+    if (walkForward?.enabled) {
+      logger.info(
+        `Walk-forward enabled: ${(walkForward.trainRatio * 100).toFixed(0)}% train / ${((1 - walkForward.trainRatio) * 100).toFixed(0)}% test`,
+      )
+    }
+
     const strategyNames = Object.keys(strategies)
     logger.info(`Symbols: ${symbols.join(', ')}`)
     logger.info(`Strategies: ${strategyNames.length}`)
 
     for (const [strategyName, strategyConfig] of Object.entries(strategies)) {
-      const { timeframes, stop_loss_pct, trailing_stop_pct } = strategyConfig
+      const {
+        timeframes,
+        stop_loss_pct,
+        trailing_stop_pct,
+        max_drawdown_pct,
+        risk_per_trade,
+      } = strategyConfig
       logger.info(
-        `  ${strategyName}: ${timeframes.join(', ')}${stop_loss_pct !== undefined ? ` SL=${(stop_loss_pct * 100).toFixed(0)}%` : ''}${trailing_stop_pct !== undefined ? ` TS=${(trailing_stop_pct * 100).toFixed(0)}%` : ''}`,
+        `  ${strategyName}: ${timeframes.join(', ')}${stop_loss_pct !== undefined ? ` SL=${(stop_loss_pct * 100).toFixed(0)}%` : ''}${trailing_stop_pct !== undefined ? ` TS=${(trailing_stop_pct * 100).toFixed(0)}%` : ''}${max_drawdown_pct !== undefined ? ` CB=${(max_drawdown_pct * 100).toFixed(0)}%` : ''}${risk_per_trade !== undefined ? ` RPT=${(risk_per_trade * 100).toFixed(0)}%` : ''}`,
       )
 
       for (const pair of symbols) {
         for (const tf of timeframes) {
-          for (const dateRange of dates) {
+          for (const dateRange of effectiveDates) {
             const dataKey = `${pair}_${tf}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}`
             if (!uniqueData.has(dataKey)) {
               uniqueData.set(dataKey, {
@@ -784,6 +1017,8 @@ export async function runSimulation(
               dbPath: `${runFolder}/${pair}_${tf}_${strategyName}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}.json`,
               stopLossPct: stop_loss_pct,
               trailingStopPct: trailing_stop_pct,
+              maxDrawdownPct: max_drawdown_pct,
+              riskPerTrade: risk_per_trade,
             })
           }
         }
@@ -793,6 +1028,27 @@ export async function runSimulation(
     if (allCombinations.length === 0) {
       logger.warn('No simulation combinations generated')
       return runId
+    }
+
+    // Walk-forward needs original full-range data files too (sub-periods read from them)
+    if (walkForward?.enabled) {
+      for (const pair of symbols) {
+        for (const [, strategyConfig] of Object.entries(strategies)) {
+          for (const tf of strategyConfig.timeframes) {
+            for (const dateRange of dates) {
+              const fullKey = `${pair}_${tf}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}`
+              if (!uniqueData.has(fullKey)) {
+                uniqueData.set(fullKey, {
+                  interval: tf,
+                  pair,
+                  start: dateRange.start,
+                  end: dateRange.end,
+                })
+              }
+            }
+          }
+        }
+      }
     }
 
     logger.info(`Downloading ${uniqueData.size} unique data files...`)

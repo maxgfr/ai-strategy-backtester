@@ -47,6 +47,23 @@ export type SimulationResult = {
     monteCarlo5th?: number
     monteCarlo95th?: number
     ruinProbability?: number
+    // Advanced metrics
+    calmarRatio?: number
+    maxConsecutiveWins?: number
+    maxConsecutiveLosses?: number
+    // Long/short breakdown
+    longTrades?: number
+    shortTrades?: number
+    longWins?: number
+    shortWins?: number
+    longProfit?: number
+    shortProfit?: number
+    totalFundingPaid?: number
+    // Sensitivity
+    feesPerTrade?: number
+    totalFeesEstimate?: number
+    returnIfFees2x?: number
+    returnIfSlippage2x?: number
   }
   category: 'Long-Only' | 'Shorting'
 }
@@ -132,6 +149,12 @@ function categoryBadgeClass(category: 'Long-Only' | 'Shorting'): string {
   return 'cat-long'
 }
 
+function formatPF(pf: number | undefined): string {
+  if (pf === undefined) return 'N/A'
+  if (pf >= 9999) return '\u221E'
+  return String(pf)
+}
+
 function colorClass(value: number): string {
   if (value > 0) return 'positive'
   if (value < 0) return 'negative'
@@ -158,13 +181,15 @@ function buildBestCard(
           <div class="best-item"><span class="label">Buy &amp; Hold</span><span class="value ${colorClass(best.data.buyAndHoldReturn ?? 0)}">${best.data.buyAndHoldPct ?? 'N/A'}</span></div>
           <div class="best-item highlight" style="border-color: ${best.data.alpha !== undefined && best.data.alpha > 0 ? '#40c057' : '#f03e3e'}"><span class="label">Alpha</span><span class="value ${colorClass(best.data.alpha ?? 0)}">${best.data.alpha !== undefined ? `${round(best.data.alpha * 100)}%` : 'N/A'}</span></div>
           <div class="best-item"><span class="label">Win Rate</span><span class="value">${best.data.percentagePosition ?? 'N/A'}</span></div>
-          <div class="best-item"><span class="label">Profit Factor</span><span class="value">${best.data.profitFactor ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Profit Factor</span><span class="value">${formatPF(best.data.profitFactor)}</span></div>
           <div class="best-item"><span class="label">Max Drawdown</span><span class="value">${best.data.maxDrawdown ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Sharpe Ratio</span><span class="value">${best.data.sharpeRatio ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Trades</span><span class="value">${best.data.nbPosition ?? 0}</span></div>
           <div class="best-item"><span class="label">Sortino</span><span class="value">${best.data.sortino ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Recovery Factor</span><span class="value">${best.data.recoveryFactor ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Calmar Ratio</span><span class="value">${best.data.calmarRatio ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Expectancy</span><span class="value ${colorClass(best.data.expectancy ?? 0)}">$${best.data.expectancy ?? 0}</span></div>
+          <div class="best-item"><span class="label">Long / Short</span><span class="value">${best.data.longTrades ?? 0}L / ${best.data.shortTrades ?? 0}S</span></div>
           <div class="best-item"><span class="label">Significant</span><span class="value">${best.data.isSignificant ? `Yes (p=${best.data.pValue ?? 'N/A'})` : 'No'}</span></div>
           <div class="best-item"><span class="label">MC Median</span><span class="value">$${(best.data.monteCarloMedian ?? 0).toLocaleString()}</span></div>
           <div class="best-item"><span class="label">Ruin Prob</span><span class="value">${best.data.ruinProbability !== undefined ? `${round(best.data.ruinProbability * 100)}%` : 'N/A'}</span></div>
@@ -381,13 +406,21 @@ function buildChartScript(
               shape: 'arrowDown',
               text: 'SHORT $' + trade.price.toFixed(2),
             });
-          } else {
+          } else if (trade.type === 'sell') {
             markers.push({
               time: closest,
               position: 'aboveBar',
               color: '#f03e3e',
               shape: 'arrowDown',
-              text: (trade.type === 'sell' ? 'SELL' : 'COVER') + ' $' + trade.price.toFixed(2) + pText,
+              text: 'SELL $' + trade.price.toFixed(2) + pText,
+            });
+          } else {
+            markers.push({
+              time: closest,
+              position: 'aboveBar',
+              color: '#e8a838',
+              shape: 'arrowDown',
+              text: 'COVER $' + trade.price.toFixed(2) + pText,
             });
           }
         }
@@ -490,11 +523,18 @@ function buildChartScript(
       '<span class="metric"><strong>Sortino:</strong> ' + meta.sortino + '</span>' +
       '<span class="metric"><strong>PF:</strong> ' + meta.profitFactor + '</span>' +
       '<span class="metric"><strong>Expectancy:</strong> $' + meta.expectancy + '</span>' +
+      '<span class="metric"><strong>Calmar:</strong> ' + meta.calmar + '</span>' +
+      '<span class="metric"><strong>DD Duration:</strong> ' + meta.maxDDDuration + '</span>' +
       '<span class="metric"><strong>MAE:</strong> ' + meta.avgMAE + '%</span>' +
       '<span class="metric"><strong>MFE:</strong> ' + meta.avgMFE + '%</span>' +
+      '<span class="metric"><strong>MAE/MFE:</strong> ' + meta.maeToMfeRatio + '</span>' +
+      '<span class="metric"><strong>Consec W/L:</strong> ' + meta.maxConsWins + '/' + meta.maxConsLosses + '</span>' +
+      '<span class="metric"><strong>Long/Short:</strong> ' + meta.longTrades + 'L / ' + meta.shortTrades + 'S</span>' +
+      (meta.fundingPaid > 0 ? '<span class="metric"><strong>Funding:</strong> $' + meta.fundingPaid + '</span>' : '') +
       '<span class="metric"><strong>MC 5-95%:</strong> $' + meta.mc5th + ' - $' + meta.mc95th + '</span>' +
       '<span class="metric"><strong>Ruin:</strong> ' + (meta.ruinProb * 100).toFixed(1) + '%</span>' +
-      '<span class="metric"><strong>Sig:</strong> ' + (meta.significant ? 'Yes (p=' + meta.pValue + ')' : 'No') + '</span>';
+      '<span class="metric"><strong>Sig:</strong> ' + (meta.significant ? 'Yes (p=' + meta.pValue + ')' : 'No') + '</span>' +
+      '<br/><span class="metric" style="color:#868e96;"><strong>Sensitivity:</strong> Fees 2x → $' + meta.returnIfFees2x + ' | Slippage 2x → $' + meta.returnIfSlippage2x + '</span>';
 
     var modal = document.getElementById('chart-modal');
     modal.classList.remove('hidden');
@@ -717,6 +757,7 @@ function buildTop10Section(results: SimulationResult[]): string {
           <div class="top10-stat"><span class="label">Avg Win Rate</span><span class="value">${a.avgWinRate}%</span></div>
           <div class="top10-stat"><span class="label">Avg Max DD</span><span class="value">${a.avgMaxDrawdown}%</span></div>
           <div class="top10-stat"><span class="label">Avg Sharpe</span><span class="value">${a.avgSharpe}</span></div>
+          <div class="top10-stat"><span class="label">Avg Sortino</span><span class="value">${a.avgSortino}</span></div>
           <div class="top10-stat"><span class="label">Avg Expectancy</span><span class="value ${colorClass(a.avgExpectancy)}">$${a.avgExpectancy}</span></div>
         </div>
       </div>`
@@ -812,13 +853,14 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <td class="${colorClass(r.data.buyAndHoldReturn ?? 0)}">${r.data.buyAndHoldPct ?? 'N/A'}</td>
           <td class="${colorClass(alpha)}">${round(alpha * 100)}%</td>
           <td>${r.data.percentagePosition ?? 'N/A'}</td>
-          <td>${r.data.profitFactor ?? 'N/A'}</td>
+          <td>${formatPF(r.data.profitFactor)}</td>
           <td>${r.data.maxDrawdown ?? 'N/A'}</td>
           <td>${r.data.sharpeRatio ?? 'N/A'}</td>
           <td>${r.data.nbPosition ?? 0}</td>
           <td>${r.data.sortino ?? 'N/A'}</td>
           <td class="${colorClass(r.data.expectancy ?? 0)}">$${r.data.expectancy ?? 0}</td>
           <td>${r.data.recoveryFactor ?? 'N/A'}</td>
+          <td>${r.data.calmarRatio ?? 'N/A'}</td>
           <td>${r.data.isSignificant ? '<span class="positive">Yes</span>' : '<span class="negative">No</span>'}</td>
           <td><button class="chart-btn" onclick="openChart('${resultKey}')">Chart</button></td>
         </tr>`
@@ -847,7 +889,8 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <th data-col="16" data-type="number">Sortino <span class="sort-arrow"></span></th>
           <th data-col="17" data-type="money">Expectancy <span class="sort-arrow"></span></th>
           <th data-col="18" data-type="number">Recovery <span class="sort-arrow"></span></th>
-          <th data-col="19" data-type="string">Significant <span class="sort-arrow"></span></th>
+          <th data-col="19" data-type="number">Calmar <span class="sort-arrow"></span></th>
+          <th data-col="20" data-type="string">Significant <span class="sort-arrow"></span></th>
           <th>Chart</th>
         </tr>
       </thead>
@@ -889,6 +932,16 @@ export function generateHtml(
       expectancy: number
       avgMAE: number
       avgMFE: number
+      maeToMfeRatio: number
+      calmar: number
+      maxDDDuration: number
+      maxConsWins: number
+      maxConsLosses: number
+      longTrades: number
+      shortTrades: number
+      fundingPaid: number
+      returnIfFees2x: number
+      returnIfSlippage2x: number
       significant: boolean
       pValue: number
       mcMedian: number
@@ -922,12 +975,22 @@ export function generateHtml(
       expectancy: r.data.expectancy ?? 0,
       avgMAE: r.data.avgMAE ?? 0,
       avgMFE: r.data.avgMFE ?? 0,
+      maeToMfeRatio: r.data.maeToMfeRatio ?? 0,
+      calmar: r.data.calmarRatio ?? 0,
+      maxDDDuration: r.data.maxDrawdownDuration ?? 0,
+      maxConsWins: r.data.maxConsecutiveWins ?? 0,
+      maxConsLosses: r.data.maxConsecutiveLosses ?? 0,
+      longTrades: r.data.longTrades ?? 0,
+      shortTrades: r.data.shortTrades ?? 0,
+      fundingPaid: r.data.totalFundingPaid ?? 0,
       significant: r.data.isSignificant ?? false,
       pValue: r.data.pValue ?? 1,
       mcMedian: r.data.monteCarloMedian ?? 0,
       mc5th: r.data.monteCarlo5th ?? 0,
       mc95th: r.data.monteCarlo95th ?? 0,
       ruinProb: r.data.ruinProbability ?? 0,
+      returnIfFees2x: r.data.returnIfFees2x ?? 0,
+      returnIfSlippage2x: r.data.returnIfSlippage2x ?? 0,
     }
   }
 

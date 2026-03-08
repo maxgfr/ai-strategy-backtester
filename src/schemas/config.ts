@@ -26,6 +26,13 @@ const StrategyConfigSchema = z.object({
   timeframes: z.array(BinanceIntervalSchema).nonempty(),
   stop_loss_pct: z.number().min(0).max(1).optional(),
   trailing_stop_pct: z.number().min(0).max(1).optional(),
+  max_drawdown_pct: z.number().min(0).max(1).optional(),
+  risk_per_trade: z.number().min(0).max(1).optional(),
+})
+
+const WalkForwardSchema = z.object({
+  enabled: z.boolean(),
+  trainRatio: z.number().min(0.1).max(0.9),
 })
 
 const GenerationSchema = z.object({
@@ -44,6 +51,8 @@ const PathsSchema = z.object({
 
 export const RawConfigSchema = z.object({
   fees: z.number().min(0).max(1),
+  makerFee: z.number().min(0).max(1).optional(),
+  takerFee: z.number().min(0).max(1).optional(),
   fundingRate: z.number().min(0).max(0.01).optional(),
   slippage: z.number().min(0).max(0.1).optional(),
   initialCapital: z.number().positive(),
@@ -51,6 +60,7 @@ export const RawConfigSchema = z.object({
   dates: z.array(DateRangeSchema).nonempty(),
   strategies: z.record(z.string(), StrategyConfigSchema),
   generation: GenerationSchema.optional(),
+  walkForward: WalkForwardSchema.optional(),
   paths: PathsSchema,
 })
 

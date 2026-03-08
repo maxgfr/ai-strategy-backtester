@@ -13,6 +13,8 @@ type WorkerData = {
   dbPath: string
   stopLossPct?: number
   trailingStopPct?: number
+  maxDrawdownPct?: number
+  riskPerTrade?: number
 }
 
 process.on('message', (data: WorkerData) => {
@@ -21,6 +23,8 @@ process.on('message', (data: WorkerData) => {
     timeframes: [data.interval as BinanceInterval],
     stop_loss_pct: data.stopLossPct,
     trailing_stop_pct: data.trailingStopPct,
+    max_drawdown_pct: data.maxDrawdownPct,
+    risk_per_trade: data.riskPerTrade,
   }
 
   runSingleSimulation(

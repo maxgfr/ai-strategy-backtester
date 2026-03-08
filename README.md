@@ -8,13 +8,20 @@ Crypto strategy backtester using Binance historical data. Define trading strateg
 - **Declarative JSON strategies** — no code required, compose indicators with buy/sell/short/cover conditions
 - **Timeframe auto-scaling** — indicator periods automatically adapt based on running timeframe (4h reference)
 - **AI strategy generation** — describe a strategy in natural language, get a validated JSON file
-- **Per-strategy configuration** — each strategy has its own timeframes, stop loss, and trailing stop settings
+- **Per-strategy configuration** — each strategy has its own timeframes, stop loss, trailing stop, circuit breaker, and risk-per-trade settings
 - **Shorting & leverage** — strategies can short sell with configurable leverage (1x-125x)
-- **Funding fees & liquidation** — realistic perpetual futures simulation with 8h funding and intra-candle liquidation
+- **Maker/taker fee split** — separate fees for entries (maker/limit) and exits (taker/market)
+- **Circuit breaker** — stop opening new positions when drawdown exceeds configurable threshold
+- **Risk-per-trade position sizing** — fractional capital allocation based on risk% / stop_loss%, with reserve capital management
+- **Funding fees & liquidation** — realistic perpetual futures simulation with 8h funding, funding-eroded margin for liquidation detection, intra-candle liquidation
+- **Walk-forward validation** — automatic train/test date range splitting to detect overfitting
+- **Data validation** — NaN/non-positive price filtering, OHLC consistency auto-fix, duplicate timestamp removal on both fetch and cache read
 - **Buy & Hold benchmark** — alpha calculation (strategy return vs B&H), drawdown duration analysis, MAE/MFE tracking
-- **Statistical analysis** — t-test significance, Monte Carlo simulation (1000 iterations) with ruin probability
+- **Advanced metrics** — annualized Sharpe/Sortino/Calmar, Recovery Factor, Expectancy, consecutive W/L, long/short breakdown, MAE/MFE ratio
+- **Sensitivity analysis** — estimated P&L impact if fees or slippage were doubled
+- **Statistical analysis** — t-test significance, percentage-based Monte Carlo simulation (1000 iterations) with ruin probability
 - **Parallel execution** — worker pool dispatches simulations across all CPU cores
-- **HTML report** — ranked results with category comparison (Long-Only vs Shorting), filter buttons, benchmark alpha, and Monte Carlo stats
+- **HTML report** — ranked results with category comparison (Long-Only vs Shorting), filter buttons, Calmar column, detailed modal with funding/MAE-MFE/Monte Carlo
 
 ## Requirements
 
@@ -127,13 +134,15 @@ pnpm generate-strategy "Buy when RSI is oversold and volume spikes above average
 
 All settings in `config.json` with a flat format:
 
-- **`fees`** — trading fees (default 0.26%)
+- **`fees`** — trading fees (default 0.26%), fallback when makerFee/takerFee not set
+- **`makerFee`** / **`takerFee`** — optional separate maker (entries) / taker (exits) fees
 - **`fundingRate`** — perpetual futures funding rate (applied every 8h, default 0.01%)
 - **`slippage`** — slippage per trade (default 0.1%)
 - **`initialCapital`** — starting capital
 - **`symbols`** — trading pairs to backtest across
 - **`dates`** — date ranges for backtesting
-- **`strategies.<name>`** — per-strategy timeframes, stop loss, and trailing stop
+- **`strategies.<name>`** — per-strategy timeframes, stop loss, trailing stop, circuit breaker, risk-per-trade
+- **`walkForward`** — optional train/test date split (`enabled`, `trainRatio`)
 
 ```json
 {
@@ -141,9 +150,12 @@ All settings in `config.json` with a flat format:
     "rsi-macd-trend-ride": {
       "timeframes": ["4h", "6h"],
       "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12
+      "trailing_stop_pct": 0.12,
+      "max_drawdown_pct": 0.25,
+      "risk_per_trade": 0.02
     }
-  }
+  },
+  "walkForward": { "enabled": true, "trainRatio": 0.7 }
 }
 ```
 
@@ -155,11 +167,11 @@ pnpm report
 ```
 
 The report includes:
-- Best strategy cards (Long-Only vs Shorting comparison, with benchmark alpha)
-- Filter buttons to toggle by category
-- Full rankings table with Strategy Return, Buy & Hold, Alpha, Sharpe, Sortino, significance
-- Modal with MAE/MFE, Monte Carlo range, ruin probability
-- Equity curve overlay in chart modal
+- Best strategy cards (Long-Only vs Shorting comparison, with Calmar Ratio + long/short breakdown)
+- Filter buttons to toggle by category (All / Long-Only / Shorting)
+- Full rankings table with Strategy Return, Buy & Hold, Alpha, Sharpe, Sortino, Calmar, significance
+- Modal with Calmar, DD Duration, MAE/MFE ratio, consecutive W/L, long/short trades, funding paid, Monte Carlo range, ruin probability, sensitivity analysis
+- Equity curve overlay (gold line) in chart modal with SHORT entry markers (purple arrows) and orange COVER markers
 - Strategy averages across timeframes
 
 ## Development

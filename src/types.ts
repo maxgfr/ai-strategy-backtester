@@ -99,4 +99,9 @@ export type DbSchema = {
   monteCarlo5th?: number
   monteCarlo95th?: number
   ruinProbability?: number
+  // Sensitivity analysis
+  feesPerTrade?: number
+  totalFeesEstimate?: number
+  returnIfFees2x?: number
+  returnIfSlippage2x?: number
 }

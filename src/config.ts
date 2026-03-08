@@ -14,6 +14,8 @@ export type StrategyConfig = {
   readonly timeframes: BinanceInterval[]
   readonly stop_loss_pct?: number
   readonly trailing_stop_pct?: number
+  readonly max_drawdown_pct?: number
+  readonly risk_per_trade?: number
 }
 
 export type GenerationConfig = {
@@ -25,8 +27,15 @@ export type GenerationConfig = {
   readonly temperature: number
 }
 
+export type WalkForwardConfig = {
+  readonly enabled: boolean
+  readonly trainRatio: number
+}
+
 export type AppConfig = {
   readonly fees: number
+  readonly makerFee: number
+  readonly takerFee: number
   readonly fundingRate: number
   readonly slippage: number
   readonly initialCapital: number
@@ -34,6 +43,7 @@ export type AppConfig = {
   readonly dates: DateRange[]
   readonly strategies: Record<string, StrategyConfig>
   readonly generation: GenerationConfig
+  readonly walkForward?: WalkForwardConfig
   readonly paths: {
     readonly dbFolder: string
     readonly dbFile: string
@@ -75,10 +85,10 @@ export function loadConfig(path?: string): AppConfig {
 
   const defaultGeneration = {
     enabled: false,
-    model: 'gpt-4o-mini',
-    baseUrl: 'https://api.openai.com/v1',
+    model: 'mistral-small-latest',
+    baseUrl: 'https://api.mistral.ai/v1',
     maxTokens: 4096,
-    temperature: 0.3,
+    temperature: 0.7,
   }
 
   const dates = raw.dates.map((d) => ({
@@ -92,11 +102,15 @@ export function loadConfig(path?: string): AppConfig {
       timeframes: cfg.timeframes as BinanceInterval[],
       stop_loss_pct: cfg.stop_loss_pct,
       trailing_stop_pct: cfg.trailing_stop_pct,
+      max_drawdown_pct: cfg.max_drawdown_pct,
+      risk_per_trade: cfg.risk_per_trade,
     }
   }
 
   return {
     fees: raw.fees,
+    makerFee: raw.makerFee ?? raw.fees,
+    takerFee: raw.takerFee ?? raw.fees,
     fundingRate: raw.fundingRate ?? 0,
     slippage: raw.slippage ?? 0,
     initialCapital: raw.initialCapital,
@@ -107,6 +121,7 @@ export function loadConfig(path?: string): AppConfig {
       ...(raw.generation ?? defaultGeneration),
       apiKey: process.env.GENERATION_API_KEY ?? '',
     },
+    walkForward: raw.walkForward,
     paths: raw.paths,
   }
 }
