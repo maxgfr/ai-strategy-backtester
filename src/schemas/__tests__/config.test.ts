@@ -5,11 +5,10 @@ const validConfig = {
   fees: 0.0026,
   initialCapital: 10000,
   symbols: ['ETHUSDT', 'BTCUSDT'],
-  dates: [{ start: '2022-01-01', end: '2026-02-01' }],
+  dates: [{ start: '2022-01-01', end: '2026-03-01' }],
   strategies: {
     supertrend: { timeframes: ['4h', '6h'] },
   },
-  paths: { dbFolder: 'db', dbFile: 'data', logFile: 'all.log' },
 }
 
 describe('RawConfigSchema', () => {
@@ -83,12 +82,6 @@ describe('RawConfigSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects missing paths', () => {
-    const { paths: _, ...noPaths } = validConfig
-    const result = RawConfigSchema.safeParse(noPaths)
-    expect(result.success).toBe(false)
-  })
-
   it('rejects stop_loss_pct > 1', () => {
     const bad = {
       ...validConfig,
@@ -102,5 +95,30 @@ describe('RawConfigSchema', () => {
     const bad = { ...validConfig, fundingRate: 0.05 }
     const result = RawConfigSchema.safeParse(bad)
     expect(result.success).toBe(false)
+  })
+
+  it('validates config with defaults', () => {
+    const withDefaults = {
+      ...validConfig,
+      defaults: {
+        timeframes: ['6h'],
+        stop_loss_pct: 0.1,
+        trailing_stop_pct: 0.15,
+      },
+      strategies: {
+        supertrend: {},
+        pmax: { timeframes: ['4h'] },
+      },
+    }
+    expect(RawConfigSchema.safeParse(withDefaults).success).toBe(true)
+  })
+
+  it('validates config with empty strategy (relies on defaults)', () => {
+    const withDefaults = {
+      ...validConfig,
+      defaults: { timeframes: ['6h'] },
+      strategies: { supertrend: {} },
+    }
+    expect(RawConfigSchema.safeParse(withDefaults).success).toBe(true)
   })
 })

@@ -927,7 +927,7 @@ export async function runSimulation(
   const config = loadConfig(configPath)
   const simulationStart = Date.now()
   const runId = generateRunId()
-  const runFolder = `${config.paths.dbFolder}/${runId}`
+  const runFolder = `db/${runId}`
   mkdirSync(runFolder, { recursive: true })
   logger.info(`Starting simulation (run: ${runId})`)
 

@@ -22,14 +22,6 @@ const DateRangeSchema = z.object({
   end: z.string(),
 })
 
-const StrategyConfigSchema = z.object({
-  timeframes: z.array(BinanceIntervalSchema).nonempty(),
-  stop_loss_pct: z.number().min(0).max(1).optional(),
-  trailing_stop_pct: z.number().min(0).max(1).optional(),
-  max_drawdown_pct: z.number().min(0).max(1).optional(),
-  risk_per_trade: z.number().min(0).max(1).optional(),
-})
-
 const WalkForwardSchema = z.object({
   enabled: z.boolean(),
   trainRatio: z.number().min(0.1).max(0.9),
@@ -38,15 +30,27 @@ const WalkForwardSchema = z.object({
 const GenerationSchema = z.object({
   enabled: z.boolean(),
   model: z.string().min(1),
-  baseUrl: z.string().url(),
+  baseUrl: z.url(),
   maxTokens: z.number().int().positive(),
   temperature: z.number().min(0).max(2),
 })
 
-const PathsSchema = z.object({
-  dbFolder: z.string().min(1),
-  dbFile: z.string().min(1),
-  logFile: z.string().min(1),
+const DefaultsSchema = z
+  .object({
+    timeframes: z.array(BinanceIntervalSchema).nonempty().optional(),
+    stop_loss_pct: z.number().min(0).max(1).optional(),
+    trailing_stop_pct: z.number().min(0).max(1).optional(),
+    max_drawdown_pct: z.number().min(0).max(1).optional(),
+    risk_per_trade: z.number().min(0).max(1).optional(),
+  })
+  .optional()
+
+const PartialStrategyConfigSchema = z.object({
+  timeframes: z.array(BinanceIntervalSchema).nonempty().optional(),
+  stop_loss_pct: z.number().min(0).max(1).optional(),
+  trailing_stop_pct: z.number().min(0).max(1).optional(),
+  max_drawdown_pct: z.number().min(0).max(1).optional(),
+  risk_per_trade: z.number().min(0).max(1).optional(),
 })
 
 export const RawConfigSchema = z.object({
@@ -58,10 +62,8 @@ export const RawConfigSchema = z.object({
   initialCapital: z.number().positive(),
   symbols: z.array(z.string().min(1)).nonempty(),
   dates: z.array(DateRangeSchema).nonempty(),
-  strategies: z.record(z.string(), StrategyConfigSchema),
+  defaults: DefaultsSchema,
+  strategies: z.record(z.string(), PartialStrategyConfigSchema),
   generation: GenerationSchema.optional(),
   walkForward: WalkForwardSchema.optional(),
-  paths: PathsSchema,
 })
-
-export type RawConfigFromSchema = z.infer<typeof RawConfigSchema>

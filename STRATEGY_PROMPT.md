@@ -470,31 +470,42 @@ Use these as reference when setting condition thresholds:
 
 ## Per-Strategy Config Parameters (set in `config.json`)
 
-These parameters are NOT part of the strategy JSON file. They are set in `config.json` under `strategies.<name>`:
+These parameters are NOT part of the strategy JSON file. They are set in `config.json` under `strategies.<name>`.
+
+An optional `defaults` section can provide fallback values for all strategies. Per-strategy values override defaults. A strategy can use `{}` to inherit all defaults.
 
 ```json
 {
+  "defaults": {
+    "timeframes": ["6h"],
+    "stop_loss_pct": 0.1,
+    "trailing_stop_pct": 0.15
+  },
   "strategies": {
     "my-strategy": {
       "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
+      "stop_loss_pct": 0.12,
+      "trailing_stop_pct": 0.18,
       "max_drawdown_pct": 0.3,
       "risk_per_trade": 0.02
-    }
+    },
+    "simple-strategy": {}
   }
 }
 ```
 
+In the example above, `my-strategy` overrides all defaults with its own values. `simple-strategy` uses `{}` and inherits `timeframes: ["6h"]`, `stop_loss_pct: 0.1`, and `trailing_stop_pct: 0.15` from `defaults`.
+
 | Parameter | Range | Description |
 |---|---|---|
-| `timeframes` | BinanceInterval[] | **Required.** Timeframes to backtest. Valid: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w` |
+| `timeframes` | BinanceInterval[] | **Required** (either per-strategy or in `defaults`). Timeframes to backtest. Valid: `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w` |
 | `stop_loss_pct` | 0–1 | Stop loss: exit when price moves against entry by this %. `0.08` = 8%. Checked intra-candle (uses high/low) |
 | `trailing_stop_pct` | 0–1 | Trailing stop: exit when price retraces from peak (long) or trough (short) by this %. `0.12` = 12% retrace from peak |
 | `max_drawdown_pct` | 0–1 | Circuit breaker: permanently stop opening new positions when account drawdown exceeds this. `0.25` = 25% DD. Does NOT close existing positions |
 | `risk_per_trade` | 0–1 | Position sizing: invest `risk / stop_loss` fraction of capital per trade. Rest in reserve. **Requires `stop_loss_pct`**. `0.02` with SL=8% → 25% invested |
 
 **Key interactions:**
+- `defaults` values are merged under each strategy — per-strategy fields take priority
 - `stop_loss_pct` + `trailing_stop_pct` can coexist — whichever triggers first exits
 - `risk_per_trade` has no effect without `stop_loss_pct`
 - `max_drawdown_pct` is permanent once tripped — no more trades even if equity recovers

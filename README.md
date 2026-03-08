@@ -76,7 +76,7 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `psar-momentum` | Parabolic SAR + ROC momentum + RSI filter |
 | `elder-impulse` | Elder Ray bull/bear power + EMA trend + ADX |
 | `dpo-rsi-pullback` | DPO cycle detection + RSI pullback + close > Supertrend |
-| `adaptive-momentum-reversal` | Asymmetric long/short: RSI+MACD bottoms + Supertrend+MACD+ADX shorts |
+| `adaptive-momentum-reversal` | Asymmetric long/short: RSI+MACD bottoms + Supertrend+MACD+ADX shorts (2x leverage) |
 | `trend-momentum-rider` | Supertrend + MACD momentum filter, patient Supertrend-only exit (top performer) |
 
 ### Creating a Strategy
@@ -170,29 +170,37 @@ All settings in `config.json` with a flat format. Validated at startup via Zod.
 
 | Section | Fields | Description |
 |---|---|---|
+| `defaults` | `timeframes`, `stop_loss_pct`, `trailing_stop_pct`, `max_drawdown_pct`, `risk_per_trade` | Optional defaults for all strategies. Per-strategy values override these defaults. Strategies can use `{}` to inherit all defaults |
 | `walkForward` | `enabled` (bool), `trainRatio` (0.1–0.9) | Train/test date split. Only test period results are kept |
 | `generation` | `enabled`, `model`, `baseUrl`, `maxTokens`, `temperature` (0–2) | AI strategy generation via `pnpm generate-strategy` |
-| `paths` | `dbFolder`, `dbFile`, `logFile` | Output directories for results, data, and logs |
 
 ### Complete Example
 
 ```json
 {
-  "fees": 0.0026,
+  "fees": 0.0025,
   "makerFee": 0.001,
   "takerFee": 0.003,
   "fundingRate": 0.0001,
   "slippage": 0.001,
   "initialCapital": 10000,
   "symbols": ["ETHUSDT", "SOLUSDT"],
-  "dates": [{ "start": "2022-01-01", "end": "now" }],
+  "dates": [
+    { "start": "2022-01-01", "end": "2024-06-01" },
+    { "start": "2024-06-01", "end": "now" }
+  ],
+  "defaults": {
+    "timeframes": ["6h", "12h"],
+    "stop_loss_pct": 0.1,
+    "trailing_stop_pct": 0.15,
+    "max_drawdown_pct": 0.3,
+    "risk_per_trade": 0.02
+  },
   "strategies": {
-    "trend-momentum-rider": {
-      "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.3,
-      "risk_per_trade": 0.02
+    "trend-momentum-rider": {},
+    "supertrend": {},
+    "adaptive-momentum-reversal": {
+      "timeframes": ["4h", "6h"]
     }
   },
   "walkForward": { "enabled": true, "trainRatio": 0.7 },
@@ -202,8 +210,7 @@ All settings in `config.json` with a flat format. Validated at startup via Zod.
     "baseUrl": "https://api.mistral.ai/v1",
     "maxTokens": 4096,
     "temperature": 0.7
-  },
-  "paths": { "dbFolder": "db", "dbFile": "data", "logFile": "all.log" }
+  }
 }
 ```
 

@@ -44,11 +44,6 @@ export type AppConfig = {
   readonly strategies: Record<string, StrategyConfig>
   readonly generation: GenerationConfig
   readonly walkForward?: WalkForwardConfig
-  readonly paths: {
-    readonly dbFolder: string
-    readonly dbFile: string
-    readonly logFile: string
-  }
 }
 
 export function maxArraySizeForInterval(interval: BinanceInterval): number {
@@ -96,14 +91,23 @@ export function loadConfig(path?: string): AppConfig {
     end: resolveDate(d.end),
   }))
 
+  const defaults = raw.defaults
   const strategies: Record<string, StrategyConfig> = {}
   for (const [name, cfg] of Object.entries(raw.strategies)) {
+    const timeframes = (cfg.timeframes ?? defaults?.timeframes) as
+      | BinanceInterval[]
+      | undefined
+    if (!timeframes || timeframes.length === 0) {
+      throw new Error(
+        `Strategy "${name}" has no timeframes and no defaults.timeframes is set`,
+      )
+    }
     strategies[name] = {
-      timeframes: cfg.timeframes as BinanceInterval[],
-      stop_loss_pct: cfg.stop_loss_pct,
-      trailing_stop_pct: cfg.trailing_stop_pct,
-      max_drawdown_pct: cfg.max_drawdown_pct,
-      risk_per_trade: cfg.risk_per_trade,
+      timeframes,
+      stop_loss_pct: cfg.stop_loss_pct ?? defaults?.stop_loss_pct,
+      trailing_stop_pct: cfg.trailing_stop_pct ?? defaults?.trailing_stop_pct,
+      max_drawdown_pct: cfg.max_drawdown_pct ?? defaults?.max_drawdown_pct,
+      risk_per_trade: cfg.risk_per_trade ?? defaults?.risk_per_trade,
     }
   }
 
@@ -122,7 +126,6 @@ export function loadConfig(path?: string): AppConfig {
       apiKey: process.env.GENERATION_API_KEY ?? '',
     },
     walkForward: raw.walkForward,
-    paths: raw.paths,
   }
 }
 

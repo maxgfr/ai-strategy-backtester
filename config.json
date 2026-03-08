@@ -1,13 +1,21 @@
 {
-  "fees": 0.0026,
+  "fees": 0.0025,
   "makerFee": 0.002,
   "takerFee": 0.003,
   "fundingRate": 0.0001,
   "slippage": 0.001,
   "initialCapital": 10000,
   "symbols": ["ETHUSDT", "SOLUSDT"],
-  "dates": [{ "start": "2022-01-01", "end": "2026-03-01" }],
-  "walkForward": { "enabled": false, "trainRatio": 0.7 },
+  "dates": [
+    { "start": "2022-01-01", "end": "2024-01-01" },
+    { "start": "2024-01-01", "end": "now" }
+  ],
+  "walkForward": { "enabled": true, "trainRatio": 0.7 },
+  "defaults": {
+    "timeframes": ["6h"],
+    "stop_loss_pct": 0.1,
+    "trailing_stop_pct": 0.15
+  },
   "strategies": {
     "trend-momentum-rider": {
       "timeframes": ["6h", "12h"],
@@ -29,108 +37,33 @@
       "stop_loss_pct": 0.12,
       "trailing_stop_pct": 0.18
     },
-    "rsi-macd-trend-ride": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.15,
-      "trailing_stop_pct": 0.2
-    },
+    "rsi-macd-trend-ride": { "stop_loss_pct": 0.15, "trailing_stop_pct": 0.2 },
     "coppock-bottom": {
       "timeframes": ["6h", "12h"],
       "stop_loss_pct": 0.15,
       "trailing_stop_pct": 0.2
     },
-    "turtle": {
-      "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.35
-    },
-    "breakout-volume": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.35
-    },
-    "keltner-breakout": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.35
-    },
-    "confluence": {
-      "timeframes": ["4h", "6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.35
-    },
-    "supertrend-pullback-momentum": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "fast-supertrend": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
+    "turtle": { "timeframes": ["6h", "12h"], "max_drawdown_pct": 0.35 },
+    "breakout-volume": { "max_drawdown_pct": 0.35 },
+    "keltner-breakout": { "max_drawdown_pct": 0.35 },
+    "confluence": { "timeframes": ["4h", "6h"], "max_drawdown_pct": 0.35 },
+    "supertrend-pullback-momentum": {},
+    "fast-supertrend": {},
     "kdj-extreme-recovery": {
-      "timeframes": ["6h"],
       "stop_loss_pct": 0.12,
       "trailing_stop_pct": 0.18
     },
-    "dpo-rsi-pullback": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
-    },
-    "bollinger-squeeze": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "stochrsi-trend-filter": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15,
-      "max_drawdown_pct": 0.3
-    },
-    "vwap-momentum": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "cci-williams-momentum": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "hull-chop-momentum": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
-    },
-    "vwma-chop-breakout": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "aroon-trend-rider": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "psar-momentum": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
-    "elder-impulse": {
-      "timeframes": ["6h"],
-      "stop_loss_pct": 0.1,
-      "trailing_stop_pct": 0.15
-    },
+    "dpo-rsi-pullback": { "stop_loss_pct": 0.12, "trailing_stop_pct": 0.18 },
+    "bollinger-squeeze": {},
+    "stochrsi-trend-filter": { "max_drawdown_pct": 0.3 },
+    "vwap-momentum": {},
+    "cci-williams-momentum": {},
+    "hull-chop-momentum": { "stop_loss_pct": 0.12, "trailing_stop_pct": 0.18 },
+    "vwma-chop-breakout": {},
+    "aroon-trend-rider": {},
+    "psar-momentum": {},
+    "elder-impulse": {},
     "adaptive-momentum-reversal": {
-      "timeframes": ["6h"],
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12,
       "max_drawdown_pct": 0.25,
@@ -143,10 +76,5 @@
     "baseUrl": "https://api.mistral.ai/v1",
     "maxTokens": 4096,
     "temperature": 0.7
-  },
-  "paths": {
-    "dbFolder": "db",
-    "dbFile": "data",
-    "logFile": "all.log"
   }
 }

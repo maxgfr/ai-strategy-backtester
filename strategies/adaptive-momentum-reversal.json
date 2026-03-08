@@ -1,7 +1,7 @@
 {
   "name": "adaptive-momentum-reversal",
   "description": "Asymmetric dual-mode: contrarian bottom picker (RSI extreme + MACD momentum turn) for longs, trend-following (Supertrend + MACD + ADX strong trend) for shorts. Dual exits via overbought/oversold + Supertrend reversals.",
-  "leverage": 1,
+  "leverage": 2,
   "indicators": {
     "rsi": { "period": 14 },
     "macd": { "fast": 12, "slow": 26, "signal": 9 },

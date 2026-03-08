@@ -60,7 +60,6 @@ describe('loadConfig', () => {
         strategies: {
           supertrend: { timeframes: ['4h'] },
         },
-        paths: { dbFolder: 'db', dbFile: 'data', logFile: 'all.log' },
       }),
     )
 
@@ -100,7 +99,6 @@ describe('loadConfig', () => {
             trailing_stop_pct: 0.12,
           },
         },
-        paths: { dbFolder: 'db', dbFile: 'data', logFile: 'all.log' },
       }),
     )
 
@@ -121,11 +119,60 @@ describe('loadConfig', () => {
         symbols: ['BTCUSDT'],
         dates: [{ start: '2023-01-01', end: '2024-01-01' }],
         strategies: { supertrend: { timeframes: ['4h'] } },
-        paths: { dbFolder: 'db', dbFile: 'data', logFile: 'all.log' },
       }),
     )
 
     const config = loadConfig(configPath)
     expect(config.fundingRate).toBe(0.0001)
+  })
+
+  test('merges defaults into strategy config', () => {
+    const configPath = resolve(TMP, 'defaults.json')
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        fees: 0.001,
+        initialCapital: 10000,
+        symbols: ['ETHUSDT'],
+        dates: [{ start: '2023-01-01', end: '2024-01-01' }],
+        defaults: {
+          timeframes: ['6h'],
+          stop_loss_pct: 0.1,
+          trailing_stop_pct: 0.15,
+        },
+        strategies: {
+          supertrend: {},
+          pmax: { timeframes: ['4h', '6h'], stop_loss_pct: 0.12 },
+        },
+      }),
+    )
+
+    const config = loadConfig(configPath)
+
+    // supertrend inherits all defaults
+    expect(config.strategies.supertrend.timeframes).toEqual(['6h'])
+    expect(config.strategies.supertrend.stop_loss_pct).toBe(0.1)
+    expect(config.strategies.supertrend.trailing_stop_pct).toBe(0.15)
+
+    // pmax overrides timeframes and stop_loss_pct, inherits trailing_stop_pct
+    expect(config.strategies.pmax.timeframes).toEqual(['4h', '6h'])
+    expect(config.strategies.pmax.stop_loss_pct).toBe(0.12)
+    expect(config.strategies.pmax.trailing_stop_pct).toBe(0.15)
+  })
+
+  test('throws when strategy has no timeframes and no defaults', () => {
+    const configPath = resolve(TMP, 'no-tf.json')
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        fees: 0.001,
+        initialCapital: 10000,
+        symbols: ['ETHUSDT'],
+        dates: [{ start: '2023-01-01', end: '2024-01-01' }],
+        strategies: { supertrend: {} },
+      }),
+    )
+
+    expect(() => loadConfig(configPath)).toThrow('no timeframes')
   })
 })
