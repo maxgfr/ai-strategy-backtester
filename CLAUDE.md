@@ -27,7 +27,7 @@ strategies/                          # ALL strategies as JSON (no TS strategies,
 ├── turtle.json                      # 200-period Donchian breakout + trailing stop
 ├── supertrend-pullback-momentum.json # Supertrend dip buyer
 ├── supertrend.json                  # ATR-based trend following
-├── confluence.json                  # Multi-indicator scoring (PMAX + score mode)
+├── confluence.json                  # Multi-indicator scoring (PMAX + 9 scored conditions)
 ├── pmax.json                        # PMAX trend following
 ├── breakout-volume.json             # Donchian breakout + volume
 ├── stochrsi-trend-filter.json       # StochRSI + Supertrend + ADX
@@ -37,14 +37,15 @@ strategies/                          # ALL strategies as JSON (no TS strategies,
 ├── fast-supertrend.json             # Fast Supertrend + RSI + ADX
 ├── vwap-momentum.json               # VWAP-gated momentum
 ├── cci-williams-momentum.json       # CCI zero-cross + Williams %R + Supertrend
-├── hull-chop-momentum.json          # HMA + Choppiness filter + Ultimate Oscillator dip
+├── hull-chop-momentum.json          # HMA + Choppiness filter + UO dip + ADX
 ├── vwma-chop-breakout.json          # VWMA/SMA divergence + Choppiness breakout
 ├── coppock-bottom.json              # Coppock Curve + McGinley Dynamic bottom picker
 ├── aroon-trend-rider.json           # Aroon trend + RSI pullback + ADX
 ├── keltner-breakout.json            # Keltner channel breakout + MACD + ADX
 ├── psar-momentum.json               # Parabolic SAR + ROC momentum + RSI
 ├── elder-impulse.json               # Elder Ray impulse + EMA trend + ADX
-└── dpo-rsi-pullback.json            # DPO cycle + RSI pullback + Supertrend
+├── dpo-rsi-pullback.json            # DPO cycle + RSI pullback + close > Supertrend
+└── adaptive-momentum-reversal.json  # Asymmetric long/short: RSI+MACD bottoms, Supertrend+MACD+ADX shorts
 src/
 ├── backtest.ts             # Entry point: backtesting CLI (accepts --report, --config)
 ├── generate.ts             # CLI entry point for AI strategy generation
@@ -59,13 +60,15 @@ src/
 ├── logger.ts               # Winston logger configuration
 ├── types.ts                # Core types (CandleStick, Position, DbSchema, BinanceInterval)
 ├── utils.ts                # Utilities (round, formatDate, addMonths)
+├── timeframes.ts           # Shared TIMEFRAME_MINUTES map (imported by config.ts and engine.ts)
+├── statistics.ts           # Statistical functions (tTest, monteCarloSimulation)
 ├── strategies/
 │   ├── registry.ts         # Strategy discovery (JSON files), getStrategy() with timeframe
 │   ├── types.ts            # StrategyFn, Signal, StrategyName types
 │   └── custom/             # Declarative JSON strategy engine
 │       ├── types.ts        # Schema types (CustomStrategyDef, SignalBlock, Condition)
 │       ├── catalog.ts      # Indicator name → wrapper fn + metadata (51 indicators)
-│       ├── engine.ts       # JSON → StrategyFn interpreter + validator + timeframe auto-scaling
+│       ├── engine.ts       # JSON → StrategyFn interpreter + validator + timeframe auto-scaling (uses timeframes.ts)
 │       └── loader.ts       # Discover & load JSON files from strategies/
 ├── schemas/                # Zod validation schemas
 │   ├── config.ts           # Config JSON schema (flat: fees, symbols, strategies, generation)
@@ -184,24 +187,25 @@ GENERATION_API_KEY=   # API key for AI strategy generation (optional)
 | **Turtle** | `turtle.json` | 200-period Donchian breakout + trailing stop exit (`_type` aliasing) |
 | **Supertrend Pullback Momentum** | `supertrend-pullback-momentum.json` | Supertrend dip buyer + RSI pullback + MACD + ADX |
 | **Supertrend** | `supertrend.json` | ATR-based trend-following |
-| **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX + Supertrend + ADX + RSI + MACD + Volume) |
+| **Confluence** | `confluence.json` | Multi-indicator scoring (PMAX gate + 9 scored conditions, threshold 4) |
 | **PMAX** | `pmax.json` | EMA + ATR-based Supertrend trend following |
 | **Breakout Volume** | `breakout-volume.json` | Donchian breakout + ADX + volume confirmation |
-| **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover in Supertrend uptrend + ADX |
+| **StochRSI Trend Filter** | `stochrsi-trend-filter.json` | StochRSI K/D crossover + Supertrend + ADX + MACD |
 | **KDJ Extreme Recovery** | `kdj-extreme-recovery.json` | KDJ J-line recovery in Supertrend uptrend |
 | **Bollinger Squeeze** | `bollinger-squeeze.json` | BB squeeze breakout + MACD + ADX |
 | **Ichimoku Cloud** | `ichimoku-cloud.json` | Ichimoku cloud trend following |
 | **Fast Supertrend** | `fast-supertrend.json` | Fast Supertrend + RSI + ADX |
 | **VWAP Momentum** | `vwap-momentum.json` | VWAP-gated score mode momentum |
 | **CCI Williams Momentum** | `cci-williams-momentum.json` | CCI zero-cross + Williams %R oversold + Supertrend |
-| **Hull Chop Momentum** | `hull-chop-momentum.json` | HMA trend + Choppiness filter + UO oversold dip |
+| **Hull Chop Momentum** | `hull-chop-momentum.json` | HMA trend + Choppiness filter + UO oversold dip + ADX |
 | **VWMA Chop Breakout** | `vwma-chop-breakout.json` | VWMA/SMA divergence + Choppiness breakout |
 | **Coppock Bottom** | `coppock-bottom.json` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
 | **Aroon Trend Rider** | `aroon-trend-rider.json` | Aroon trend detection + RSI pullback + ADX filter |
 | **Keltner Breakout** | `keltner-breakout.json` | Keltner channel breakout + MACD + ADX |
 | **PSAR Momentum** | `psar-momentum.json` | Parabolic SAR + ROC momentum + RSI filter |
 | **Elder Impulse** | `elder-impulse.json` | Elder Ray bull/bear power + EMA trend + ADX |
-| **DPO RSI Pullback** | `dpo-rsi-pullback.json` | DPO cycle detection + RSI pullback + Supertrend |
+| **DPO RSI Pullback** | `dpo-rsi-pullback.json` | DPO cycle detection + RSI pullback + close > Supertrend |
+| **Adaptive Momentum Reversal** | `adaptive-momentum-reversal.json` | Asymmetric long/short: contrarian RSI+MACD bottoms + trend-following Supertrend+MACD+ADX shorts |
 
 The registry (`src/strategies/registry.ts`) discovers JSON files from `strategies/` — no builtin factories, no pattern matching. Each returns `Signal = 'buy' | 'sell' | 'short' | 'cover'`.
 
@@ -247,13 +251,15 @@ The registry (`src/strategies/registry.ts`) discovers JSON files from `strategie
 - Each worker receives `maxArraySize` computed dynamically from interval, plus per-strategy `stop_loss_pct` and `trailing_stop_pct`
 - Each run creates `db/{runId}/` with results as `{pair}_{interval}_{strategy}_{start}_{end}.json`
 - `runId` is an auto-generated timestamp (`YYYYMMDD_HHmmss`) — concurrent runs never collide
-- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, slippage, separate long/short trade metrics
+- **Simulation features**: funding fees (8h periods), liquidation detection (intra-candle via high/low), stop loss, trailing stop, slippage, separate long/short trade metrics, Buy & Hold benchmark (alpha), drawdown duration analysis, MAE/MFE tracking, statistical significance (t-test), Monte Carlo simulation (1000 iterations)
 - Report generated as `reports/report_<timestamp>.html` (unique per run, no overwrite) with:
-  - **Category comparison cards** (best Long-Only vs best Shorting side by side)
+  - **Category comparison cards** (best Long-Only vs best Shorting side by side, with benchmark comparison)
   - **Filter buttons** (All / Long-Only / Shorting) to toggle rankings and averages tables
   - **Category badges**: Long-Only (green), Shorting (purple)
   - Classification is data-driven: `shortTrades > 0` = Shorting, else Long-Only
+  - **Rankings table**: Strategy Return, Buy & Hold, Alpha, Significant columns
   - **Equity curve** (gold line) overlaid on chart modal
+  - **Modal details**: MAE/MFE, Monte Carlo range, ruin probability
   - Chart markers: purple arrows for SHORT entries, labels distinguish SELL vs COVER on exits
 
 ---
@@ -270,7 +276,12 @@ type CandleStick = { open, high, close, low, volume, time }
 type LastPosition = { date, type, price, capital, assets, tradeProfit? }
 type DbSchema = { version, initialParameters, historicPosition, position, ...metrics,
                   longTrades?, shortTrades?, longWins?, shortWins?, longProfit?, shortProfit?, totalFundingPaid?,
-                  sortino?, calmarRatio?, recoveryFactor?, avgWin?, avgLoss?, maxConsecutiveWins?, maxConsecutiveLosses?, expectancy? }
+                  sortino?, calmarRatio?, recoveryFactor?, avgWin?, avgLoss?, maxConsecutiveWins?, maxConsecutiveLosses?, expectancy?,
+                  buyAndHoldReturn?, buyAndHoldPct?, strategyReturn?, strategyReturnPct?, alpha?,
+                  maxDrawdownDuration?, avgDrawdownDuration?, timeToRecovery?,
+                  avgMAE?, avgMFE?, maeToMfeRatio?,
+                  tStatistic?, pValue?, isSignificant?,
+                  monteCarloMedian?, monteCarlo5th?, monteCarlo95th?, ruinProbability? }
 type StrategyConfig = { timeframes, stop_loss_pct?, trailing_stop_pct? }  // in config.ts
 type AppConfig = { fees, fundingRate, slippage, initialCapital, symbols, dates, strategies: Record<string, StrategyConfig>, generation, paths }
 ```

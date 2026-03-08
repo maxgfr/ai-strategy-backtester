@@ -11,8 +11,10 @@ Crypto strategy backtester using Binance historical data. Define trading strateg
 - **Per-strategy configuration** — each strategy has its own timeframes, stop loss, and trailing stop settings
 - **Shorting & leverage** — strategies can short sell with configurable leverage (1x-125x)
 - **Funding fees & liquidation** — realistic perpetual futures simulation with 8h funding and intra-candle liquidation
+- **Buy & Hold benchmark** — alpha calculation (strategy return vs B&H), drawdown duration analysis, MAE/MFE tracking
+- **Statistical analysis** — t-test significance, Monte Carlo simulation (1000 iterations) with ruin probability
 - **Parallel execution** — worker pool dispatches simulations across all CPU cores
-- **HTML report** — ranked results with category comparison (Long-Only vs Shorting), filter buttons, and key metrics
+- **HTML report** — ranked results with category comparison (Long-Only vs Shorting), filter buttons, benchmark alpha, and Monte Carlo stats
 
 ## Requirements
 
@@ -41,7 +43,7 @@ pnpm backtest --report ETHUSDT 4h 2022-01-01 2026-02-01 rsi-macd-trend-ride
 
 All strategies live as `.json` files in `strategies/`. They are auto-discovered on each run. No prefix conventions — all names are plain kebab-case.
 
-### Available Strategies (22)
+### Available Strategies (23)
 
 | Strategy | Description |
 |----------|-------------|
@@ -49,24 +51,25 @@ All strategies live as `.json` files in `strategies/`. They are auto-discovered 
 | `turtle` | 200-period Donchian breakout + trailing stop |
 | `supertrend-pullback-momentum` | Supertrend dip buyer + RSI pullback |
 | `supertrend` | ATR-based trend following |
-| `confluence` | Multi-indicator score mode (PMAX + Supertrend + ADX + RSI + MACD) |
+| `confluence` | Multi-indicator score mode (PMAX gate + 9 scored conditions, threshold 4) |
 | `pmax` | EMA + ATR-based Supertrend |
 | `breakout-volume` | Donchian breakout + ADX + volume |
-| `stochrsi-trend-filter` | StochRSI crossover in Supertrend uptrend |
+| `stochrsi-trend-filter` | StochRSI K/D crossover + Supertrend + ADX + MACD |
 | `kdj-extreme-recovery` | KDJ J-line recovery in uptrend |
 | `bollinger-squeeze` | BB squeeze breakout + MACD + ADX |
 | `ichimoku-cloud` | Ichimoku cloud trend following |
 | `fast-supertrend` | Fast Supertrend + RSI + ADX |
 | `vwap-momentum` | VWAP-gated score mode |
 | `cci-williams-momentum` | CCI zero-cross + Williams %R + Supertrend |
-| `hull-chop-momentum` | HMA trend + Choppiness filter + UO oversold dip |
+| `hull-chop-momentum` | HMA trend + Choppiness filter + UO oversold dip + ADX |
 | `vwma-chop-breakout` | VWMA/SMA divergence + Choppiness breakout |
 | `coppock-bottom` | Coppock Curve zero-cross + McGinley Dynamic bottom picker |
 | `aroon-trend-rider` | Aroon trend detection + RSI pullback + ADX filter |
 | `keltner-breakout` | Keltner channel breakout + MACD + ADX |
 | `psar-momentum` | Parabolic SAR + ROC momentum + RSI filter |
 | `elder-impulse` | Elder Ray bull/bear power + EMA trend + ADX |
-| `dpo-rsi-pullback` | DPO cycle detection + RSI pullback + Supertrend |
+| `dpo-rsi-pullback` | DPO cycle detection + RSI pullback + close > Supertrend |
+| `adaptive-momentum-reversal` | Asymmetric long/short: RSI+MACD bottoms + Supertrend+MACD+ADX shorts |
 
 ### Creating a Strategy
 
@@ -152,9 +155,10 @@ pnpm report
 ```
 
 The report includes:
-- Best strategy cards (Long-Only vs Shorting comparison)
+- Best strategy cards (Long-Only vs Shorting comparison, with benchmark alpha)
 - Filter buttons to toggle by category
-- Full rankings table with profit, win rate, max drawdown, Sharpe, Sortino, expectancy, recovery factor
+- Full rankings table with Strategy Return, Buy & Hold, Alpha, Sharpe, Sortino, significance
+- Modal with MAE/MFE, Monte Carlo range, ruin probability
 - Equity curve overlay in chart modal
 - Strategy averages across timeframes
 

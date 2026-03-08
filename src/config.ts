@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ZodError } from 'zod'
 import { RawConfigSchema } from './schemas/config'
+import { TIMEFRAME_MINUTES } from './timeframes'
 import type { BinanceInterval, DbSchema } from './types'
 
 export type DateRange = {
@@ -38,27 +39,6 @@ export type AppConfig = {
     readonly dbFile: string
     readonly logFile: string
   }
-}
-
-/**
- * Sliding window of candles passed to strategies each tick.
- * Shorter timeframes need more candles for the same wall-clock warmup.
- */
-const TIMEFRAME_MINUTES: Record<string, number> = {
-  '1m': 1,
-  '3m': 3,
-  '5m': 5,
-  '15m': 15,
-  '30m': 30,
-  '1h': 60,
-  '2h': 120,
-  '4h': 240,
-  '6h': 360,
-  '8h': 480,
-  '12h': 720,
-  '1d': 1440,
-  '3d': 4320,
-  '1w': 10080,
 }
 
 export function maxArraySizeForInterval(interval: BinanceInterval): number {

@@ -29,12 +29,13 @@ const getDaysInMonth = (year: number, month: number): number =>
   new Date(year, month, 0).getDate()
 
 export const addMonths = (inputDate: Date, months: number): Date => {
-  const date = inputDate
+  const originalDay = inputDate.getDate()
+  const date = new Date(inputDate.getTime())
   date.setDate(1)
   date.setMonth(date.getMonth() + months)
   date.setDate(
     Math.min(
-      inputDate.getDate(),
+      originalDay,
       getDaysInMonth(date.getFullYear(), date.getMonth() + 1),
     ),
   )

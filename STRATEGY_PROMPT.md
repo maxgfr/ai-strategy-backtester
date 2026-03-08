@@ -285,7 +285,7 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
   },
   "buy": {
     "mode": "score",
-    "threshold": 5,
+    "threshold": 4,
     "required": [["pmax.pmax", "==", "pmax.pmaxLong"]],
     "scored": [
       ["close", ">", "supertrend"],
@@ -293,7 +293,6 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
       ["adx.adx", ">", "adx.adx[-2]"],
       ["rsi", ">=", 30],
       ["rsi", "<=", 70],
-      ["macd.macd", ">", "macd.signal"],
       ["macd.histogram", ">", 0],
       ["volume", ">", "volumeSma"],
       ["atrRatio", ">", 0.5],
@@ -368,19 +367,19 @@ Now `"breakout.upper"` and `"exit.lower"` reference different donchian instances
   "indicators": {
     "dpo": { "period": 20 },
     "rsi": { "period": 14 },
-    "supertrend": { "period": 10, "multiplier": 3 }
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
       ["dpo", ">", "dpo[-1]"],
       ["rsi", "<", 40],
-      ["supertrend.direction", "==", 1]
+      ["close", ">", "supertrend"]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["rsi", ">", 75], ["supertrend.direction", "==", -1]]
+    "conditions": [["rsi", ">", 75], ["close", "<", "supertrend"]]
   }
 }
 ```

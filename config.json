@@ -115,6 +115,11 @@
       "timeframes": ["4h", "6h"],
       "stop_loss_pct": 0.08,
       "trailing_stop_pct": 0.12
+    },
+    "adaptive-momentum-reversal": {
+      "timeframes": ["4h", "6h"],
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.12
     }
   },
   "generation": {

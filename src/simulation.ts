@@ -12,6 +12,7 @@ import {
 import { readAndLoadData } from './data'
 import { Database, type IDatabase } from './database'
 import { logger } from './logger'
+import { monteCarloSimulation, tTest } from './statistics'
 import { getStrategy } from './strategies/registry'
 import type { StrategyFn } from './strategies/types'
 import { executeBuy, executeCover, executeSell, executeShort } from './trade'
@@ -115,6 +116,19 @@ function computeAdvancedMetrics(
     db.set('maxConsecutiveWins', 0)
     db.set('maxConsecutiveLosses', 0)
     db.set('expectancy', 0)
+    db.set('maxDrawdownDuration', 0)
+    db.set('avgDrawdownDuration', 0)
+    db.set('timeToRecovery', 0)
+    db.set('avgMAE', 0)
+    db.set('avgMFE', 0)
+    db.set('maeToMfeRatio', 0)
+    db.set('tStatistic', 0)
+    db.set('pValue', 1)
+    db.set('isSignificant', false)
+    db.set('monteCarloMedian', 0)
+    db.set('monteCarlo5th', 0)
+    db.set('monteCarlo95th', 0)
+    db.set('ruinProbability', 0)
     return
   }
 
@@ -124,14 +138,61 @@ function computeAdvancedMetrics(
   const grossLoss = Math.abs(losses.reduce((s, p) => s + p, 0))
   const profitFactor = grossLoss === 0 ? 9999 : round(grossProfit / grossLoss)
 
-  // Max drawdown
+  // Max drawdown + drawdown duration analysis
   let maxDrawdown = 0
+  let maxDrawdownPeak = initialCapital
   let peak = initialCapital
-  for (const pos of allPosition) {
-    if (pos.capital > peak) peak = pos.capital
+  let drawdownStart = -1
+  let maxDrawdownDuration = 0
+  let currentDrawdownDuration = 0
+  let totalDrawdownDuration = 0
+  let drawdownCount = 0
+  let longestRecovery = 0
+  let recoveryStart = -1
+
+  for (let i = 0; i < allPosition.length; i++) {
+    const pos = allPosition[i]
+    if (pos.capital > peak) {
+      // New peak — end of drawdown
+      if (drawdownStart >= 0) {
+        const duration = i - drawdownStart
+        totalDrawdownDuration += duration
+        drawdownCount++
+        if (recoveryStart >= 0) {
+          const recovery = i - recoveryStart
+          if (recovery > longestRecovery) longestRecovery = recovery
+        }
+      }
+      peak = pos.capital
+      drawdownStart = -1
+      recoveryStart = -1
+    }
     const drawdown = (peak - pos.capital) / peak
-    if (drawdown > maxDrawdown) maxDrawdown = drawdown
+    if (drawdown > 0 && drawdownStart < 0) {
+      drawdownStart = i
+      recoveryStart = i
+    }
+    if (drawdown > 0) {
+      currentDrawdownDuration = i - (drawdownStart >= 0 ? drawdownStart : i)
+      if (currentDrawdownDuration > maxDrawdownDuration) {
+        maxDrawdownDuration = currentDrawdownDuration
+      }
+    }
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown
+      maxDrawdownPeak = peak
+    }
   }
+  // If still in drawdown at end
+  if (drawdownStart >= 0) {
+    const duration = allPosition.length - drawdownStart
+    totalDrawdownDuration += duration
+    drawdownCount++
+    if (duration > maxDrawdownDuration) maxDrawdownDuration = duration
+  }
+
+  const avgDrawdownDuration =
+    drawdownCount === 0 ? 0 : round(totalDrawdownDuration / drawdownCount)
 
   const mean = tradeProfits.reduce((s, p) => s + p, 0) / tradeProfits.length
   const variance =
@@ -139,17 +200,20 @@ function computeAdvancedMetrics(
   const stdDev = Math.sqrt(variance)
 
   // Annualized Sharpe: multiply by sqrt(trades per year)
-  const backtestYears = Math.max(backtestDays / 365, 0.01)
-  const tradesPerYear = tradeProfits.length / backtestYears
+  const backtestYears = backtestDays / 365
+  const tradesPerYear =
+    backtestYears > 0
+      ? tradeProfits.length / backtestYears
+      : tradeProfits.length
   const annualizationFactor = Math.sqrt(tradesPerYear)
   const sharpe = stdDev === 0 ? 0 : round((mean / stdDev) * annualizationFactor)
 
-  // Sortino: downside deviation only
+  // Sortino: downside deviation only (denominator = number of losing trades)
   const downsideReturns = tradeProfits.filter((p) => p < 0)
   const downsideVariance =
     downsideReturns.length === 0
       ? 0
-      : downsideReturns.reduce((s, p) => s + p ** 2, 0) / tradeProfits.length
+      : downsideReturns.reduce((s, p) => s + p ** 2, 0) / downsideReturns.length
   const downsideDev = Math.sqrt(downsideVariance)
   const sortino =
     downsideDev === 0 ? 0 : round((mean / downsideDev) * annualizationFactor)
@@ -158,15 +222,13 @@ function computeAdvancedMetrics(
   const finalCapital = db.get('position').capital
   const totalReturn = finalCapital - initialCapital
 
-  // Calmar Ratio: annualized return / max drawdown
+  // Calmar Ratio: annualized return / max drawdown (dollar from the peak that produced it)
+  const maxDrawdownDollar = maxDrawdown * maxDrawdownPeak
   const annualizedReturn = totalReturn / backtestYears
   const calmarRatio =
-    maxDrawdown === 0
-      ? 0
-      : round(annualizedReturn / (maxDrawdown * initialCapital))
+    maxDrawdownDollar === 0 ? 0 : round(annualizedReturn / maxDrawdownDollar)
 
   // Recovery Factor: total return / max drawdown (dollar)
-  const maxDrawdownDollar = maxDrawdown * peak
   const recoveryFactor =
     maxDrawdownDollar === 0 ? 0 : round(totalReturn / maxDrawdownDollar)
 
@@ -184,17 +246,24 @@ function computeAdvancedMetrics(
       consWins++
       consLosses = 0
       if (consWins > maxConsWins) maxConsWins = consWins
-    } else {
+    } else if (p < 0) {
       consLosses++
       consWins = 0
       if (consLosses > maxConsLosses) maxConsLosses = consLosses
     }
+    // breakeven (p === 0): don't affect streaks
   }
 
   // Expectancy: (avgWin × winRate) - (avgLoss × lossRate)
   const winRate = wins.length / tradeProfits.length
   const lossRate = losses.length / tradeProfits.length
   const expectancy = round(avgWin * winRate - avgLoss * lossRate)
+
+  // Statistical significance (t-test on trade profits)
+  const { tStatistic, pValue, isSignificant } = tTest(tradeProfits)
+
+  // Monte Carlo simulation
+  const mc = monteCarloSimulation(tradeProfits, initialCapital)
 
   db.set('profitFactor', profitFactor)
   db.set('maxDrawdown', `${round(maxDrawdown * 100)}%`)
@@ -208,6 +277,16 @@ function computeAdvancedMetrics(
   db.set('maxConsecutiveWins', maxConsWins)
   db.set('maxConsecutiveLosses', maxConsLosses)
   db.set('expectancy', expectancy)
+  db.set('maxDrawdownDuration', maxDrawdownDuration)
+  db.set('avgDrawdownDuration', avgDrawdownDuration)
+  db.set('timeToRecovery', longestRecovery)
+  db.set('tStatistic', tStatistic)
+  db.set('pValue', pValue)
+  db.set('isSignificant', isSignificant)
+  db.set('monteCarloMedian', mc.median)
+  db.set('monteCarlo5th', mc.p5)
+  db.set('monteCarlo95th', mc.p95)
+  db.set('ruinProbability', mc.ruinProbability)
 }
 
 type SimulationOptions = {
@@ -247,6 +326,14 @@ async function simulation(
   let accumulatedFunding = 0
   let totalFundingPaid = 0
   let prevTime = 0
+
+  // MAE/MFE tracking per trade
+  let tradeEntryPrice = 0
+  let tradeMAE = 0 // max adverse excursion (worst unrealized loss %)
+  let tradeMFE = 0 // max favorable excursion (best unrealized gain %)
+  let tradeType: 'buy' | 'short' | null = null
+  const maeValues: number[] = []
+  const mfeValues: number[] = []
 
   for (let i = 0; i < historic.length; i++) {
     const candle = historic[i]
@@ -306,6 +393,11 @@ async function simulation(
         }
         db.set('position', position)
         db.push('historicPosition', position)
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
         peakPrice = 0
         accumulatedFunding = 0
         continue
@@ -326,6 +418,11 @@ async function simulation(
         }
         db.set('position', position)
         db.push('historicPosition', position)
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+          tradeType = null
+        }
         troughPrice = Number.POSITIVE_INFINITY
         accumulatedFunding = 0
         continue
@@ -378,6 +475,17 @@ async function simulation(
       }
     }
 
+    // === MAE/MFE tracking ===
+    if (tradeType === 'buy' && tradeEntryPrice > 0) {
+      const pctMove = (price - tradeEntryPrice) / tradeEntryPrice
+      if (pctMove < tradeMAE) tradeMAE = pctMove
+      if (pctMove > tradeMFE) tradeMFE = pctMove
+    } else if (tradeType === 'short' && tradeEntryPrice > 0) {
+      const pctMove = (tradeEntryPrice - price) / tradeEntryPrice
+      if (pctMove < tradeMAE) tradeMAE = pctMove
+      if (pctMove > tradeMFE) tradeMFE = pctMove
+    }
+
     // === Strategy signal ===
     const signal = strategy(dataWindow, lastPosition.type)
 
@@ -387,35 +495,81 @@ async function simulation(
       peakPrice = buyPrice
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
+      tradeEntryPrice = buyPrice
+      tradeMAE = 0
+      tradeMFE = 0
+      tradeType = 'buy'
     } else if (signal === 'sell' && lastPosition.type !== 'sell') {
+      if (tradeType !== null) {
+        maeValues.push(tradeMAE)
+        mfeValues.push(tradeMFE)
+      }
       const sellPrice = price * (1 - slippage)
       executeSell(sellPrice, date, db, fees, leverage, accumulatedFunding)
       peakPrice = 0
       accumulatedFunding = 0
+      tradeType = null
     } else if (signal === 'short' && lastPosition.type !== 'short') {
       const shortPrice = price * (1 - slippage)
       executeShort(shortPrice, date, db, fees, leverage)
       troughPrice = shortPrice
       peakPrice = 0
       accumulatedFunding = 0
+      tradeEntryPrice = shortPrice
+      tradeMAE = 0
+      tradeMFE = 0
+      tradeType = 'short'
     } else if (signal === 'cover' && lastPosition.type === 'short') {
+      if (tradeType !== null) {
+        maeValues.push(tradeMAE)
+        mfeValues.push(tradeMFE)
+      }
       const coverPrice = price * (1 + slippage)
       executeCover(coverPrice, date, db, fees, leverage, accumulatedFunding)
       troughPrice = Number.POSITIVE_INFINITY
       accumulatedFunding = 0
+      tradeType = null
     }
 
     // === Final candle: close positions and compute metrics ===
     if (i === historic.length - 1) {
       const finalType = db.get('position').type
       if (finalType === 'buy') {
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+        }
         executeSell(price, date, db, fees, leverage, accumulatedFunding)
+        tradeType = null
       } else if (finalType === 'short') {
+        if (tradeType !== null) {
+          maeValues.push(tradeMAE)
+          mfeValues.push(tradeMFE)
+        }
         executeCover(price, date, db, fees, leverage, accumulatedFunding)
+        tradeType = null
       }
       const finalPosition = db.get('position')
       const hodlAssets = db.get('hodlAssets') ?? 0
       const hodlMoney = hodlAssets * price
+
+      // Buy & Hold benchmark
+      const buyAndHoldReturn = round(hodlMoney - initialCapital)
+      const buyAndHoldPct =
+        initialCapital === 0
+          ? '0%'
+          : `${round(((hodlMoney - initialCapital) / initialCapital) * 100)}%`
+      const strategyReturn = round(finalPosition.capital - initialCapital)
+      const strategyReturnPct =
+        initialCapital === 0
+          ? '0%'
+          : `${round(((finalPosition.capital - initialCapital) / initialCapital) * 100)}%`
+      const alpha = round(
+        (finalPosition.capital - initialCapital) / initialCapital -
+          (hodlMoney - initialCapital) / initialCapital,
+        4,
+      )
+
       db.set('hodlMoney', hodlMoney)
       db.set('lastPositionMoney', finalPosition.capital)
       db.set('profit', finalPosition.capital - hodlMoney)
@@ -426,6 +580,32 @@ async function simulation(
           : `${round(((finalPosition.capital - hodlMoney) / hodlMoney) * 100)}%`,
       )
       db.set('totalFundingPaid', round(totalFundingPaid))
+
+      // Buy & Hold fields
+      db.set('buyAndHoldReturn', buyAndHoldReturn)
+      db.set('buyAndHoldPct', buyAndHoldPct)
+      db.set('strategyReturn', strategyReturn)
+      db.set('strategyReturnPct', strategyReturnPct)
+      db.set('alpha', alpha)
+
+      // MAE/MFE
+      const avgMAE =
+        maeValues.length === 0
+          ? 0
+          : round(
+              (maeValues.reduce((s, v) => s + v, 0) / maeValues.length) * 100,
+            )
+      const avgMFE =
+        mfeValues.length === 0
+          ? 0
+          : round(
+              (mfeValues.reduce((s, v) => s + v, 0) / mfeValues.length) * 100,
+            )
+      const maeToMfeRatio = avgMFE === 0 ? 0 : round(Math.abs(avgMAE) / avgMFE)
+      db.set('avgMAE', avgMAE)
+      db.set('avgMFE', avgMFE)
+      db.set('maeToMfeRatio', maeToMfeRatio)
+
       computeTradeStats(db)
       const backtestDays =
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)

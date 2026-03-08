@@ -4,18 +4,18 @@
   "indicators": {
     "dpo": { "period": 20 },
     "rsi": { "period": 14 },
-    "supertrend": { "period": 10, "multiplier": 3 }
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 }
   },
   "buy": {
     "mode": "all",
     "conditions": [
       ["dpo", ">", "dpo[-1]"],
       ["rsi", "<", 40],
-      ["supertrend.direction", "==", 1]
+      ["close", ">", "supertrend"]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["rsi", ">", 75], ["supertrend.direction", "==", -1]]
+    "conditions": [["rsi", ">", 75], ["close", "<", "supertrend"]]
   }
 }

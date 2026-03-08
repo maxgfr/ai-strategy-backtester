@@ -24,6 +24,9 @@ export class Database implements IDatabase {
     } catch (err: unknown) {
       const isNotFound =
         err instanceof Error && 'code' in err && err.code === 'ENOENT'
+      if (!isNotFound && !(err instanceof SyntaxError)) {
+        throw err
+      }
       if (!isNotFound && err instanceof SyntaxError) {
         throw new Error(`Corrupted database file: ${path}`)
       }

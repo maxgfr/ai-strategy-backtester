@@ -76,4 +76,27 @@ export type DbSchema = {
   maxConsecutiveWins?: number
   maxConsecutiveLosses?: number
   expectancy?: number
+  // Buy & Hold benchmark
+  buyAndHoldReturn?: number
+  buyAndHoldPct?: string
+  strategyReturn?: number
+  strategyReturnPct?: string
+  alpha?: number
+  // Drawdown analysis
+  maxDrawdownDuration?: number
+  avgDrawdownDuration?: number
+  timeToRecovery?: number
+  // MAE/MFE analysis
+  avgMAE?: number
+  avgMFE?: number
+  maeToMfeRatio?: number
+  // Statistical significance
+  tStatistic?: number
+  pValue?: number
+  isSignificant?: boolean
+  // Monte Carlo
+  monteCarloMedian?: number
+  monteCarlo5th?: number
+  monteCarlo95th?: number
+  ruinProbability?: number
 }

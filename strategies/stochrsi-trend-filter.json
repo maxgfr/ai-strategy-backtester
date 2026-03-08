@@ -18,7 +18,6 @@
     "conditions": [
       ["close", ">", "supertrend"],
       ["stochRsi.k", ">", "stochRsi.d"],
-      ["stochRsi.k[-1]", "<", "stochRsi.d[-1]"],
       ["adx.adx", ">", 20],
       ["macd.histogram", ">", 0]
     ]

@@ -23,7 +23,7 @@ export function ROC({
     if (window.length > period + 1) window.shift()
 
     const oldest = window[0]
-    const roc = ((candle.close - oldest) / oldest) * 100
+    const roc = oldest === 0 ? 0 : ((candle.close - oldest) / oldest) * 100
     return { time: candle.time, value: roc }
   }
 

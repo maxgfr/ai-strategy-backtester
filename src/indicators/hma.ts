@@ -27,7 +27,7 @@ export function hma(candles: CandleStick[], period = 16): number[] {
   }
 
   const wmaFinal = WMA({ candles: [], period: sqrtPeriod })
-  const results: number[] = new Array(candles.length).fill(0)
+  const results: number[] = new Array(candles.length).fill(NaN)
   const startIndex = candles.length - intermediateValues.length
 
   for (let i = 0; i < intermediateValues.length; i++) {

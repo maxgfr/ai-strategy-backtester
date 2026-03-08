@@ -24,6 +24,29 @@ export type SimulationResult = {
     avgWin?: number
     avgLoss?: number
     historicPosition?: LastPosition[]
+    // Buy & Hold benchmark
+    buyAndHoldReturn?: number
+    buyAndHoldPct?: string
+    strategyReturn?: number
+    strategyReturnPct?: string
+    alpha?: number
+    // Drawdown analysis
+    maxDrawdownDuration?: number
+    avgDrawdownDuration?: number
+    timeToRecovery?: number
+    // MAE/MFE
+    avgMAE?: number
+    avgMFE?: number
+    maeToMfeRatio?: number
+    // Statistical significance
+    tStatistic?: number
+    pValue?: number
+    isSignificant?: boolean
+    // Monte Carlo
+    monteCarloMedian?: number
+    monteCarlo5th?: number
+    monteCarlo95th?: number
+    ruinProbability?: number
   }
   category: 'Long-Only' | 'Shorting'
 }
@@ -131,16 +154,20 @@ function buildBestCard(
           <div class="best-item"><span class="label">Dates</span><span class="value">${best.startDate} \u2192 ${best.endDate}</span></div>
           <div class="best-item"><span class="label">Initial Capital</span><span class="value">$${round(best.data.initialCapital ?? 0).toLocaleString()}</span></div>
           <div class="best-item highlight" style="border-color: ${accentColor}"><span class="label">Final Capital</span><span class="value">$${round(best.data.lastPositionMoney ?? 0).toLocaleString()}</span></div>
-          <div class="best-item"><span class="label">Profit vs HODL</span><span class="value ${colorClass(best.data.profit ?? 0)}">${best.data.percentageProfit ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Strategy Return</span><span class="value ${colorClass(best.data.strategyReturn ?? 0)}">${best.data.strategyReturnPct ?? 'N/A'}</span></div>
+          <div class="best-item"><span class="label">Buy &amp; Hold</span><span class="value ${colorClass(best.data.buyAndHoldReturn ?? 0)}">${best.data.buyAndHoldPct ?? 'N/A'}</span></div>
+          <div class="best-item highlight" style="border-color: ${best.data.alpha !== undefined && best.data.alpha > 0 ? '#40c057' : '#f03e3e'}"><span class="label">Alpha</span><span class="value ${colorClass(best.data.alpha ?? 0)}">${best.data.alpha !== undefined ? `${round(best.data.alpha * 100)}%` : 'N/A'}</span></div>
           <div class="best-item"><span class="label">Win Rate</span><span class="value">${best.data.percentagePosition ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Profit Factor</span><span class="value">${best.data.profitFactor ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Max Drawdown</span><span class="value">${best.data.maxDrawdown ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Sharpe Ratio</span><span class="value">${best.data.sharpeRatio ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Trades</span><span class="value">${best.data.nbPosition ?? 0}</span></div>
-          <div class="best-item"><span class="label">Avg Trade Profit</span><span class="value ${colorClass(best.data.avgTradeProfit ?? 0)}">$${best.data.avgTradeProfit ?? 0}</span></div>
           <div class="best-item"><span class="label">Sortino</span><span class="value">${best.data.sortino ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Recovery Factor</span><span class="value">${best.data.recoveryFactor ?? 'N/A'}</span></div>
           <div class="best-item"><span class="label">Expectancy</span><span class="value ${colorClass(best.data.expectancy ?? 0)}">$${best.data.expectancy ?? 0}</span></div>
+          <div class="best-item"><span class="label">Significant</span><span class="value">${best.data.isSignificant ? `Yes (p=${best.data.pValue ?? 'N/A'})` : 'No'}</span></div>
+          <div class="best-item"><span class="label">MC Median</span><span class="value">$${(best.data.monteCarloMedian ?? 0).toLocaleString()}</span></div>
+          <div class="best-item"><span class="label">Ruin Prob</span><span class="value">${best.data.ruinProbability !== undefined ? `${round(best.data.ruinProbability * 100)}%` : 'N/A'}</span></div>
         </div>
       </div>`
 }
@@ -453,15 +480,21 @@ function buildChartScript(
 
     document.getElementById('modal-title').textContent = meta.strategy + ' \\u2014 ' + meta.pair + ' ' + meta.interval;
     document.getElementById('modal-metrics').innerHTML =
-      '<span class="metric"><strong>Profit:</strong> ' + meta.profit + '</span>' +
+      '<span class="metric"><strong>Strategy:</strong> ' + meta.profit + '</span>' +
+      '<span class="metric"><strong>B&H:</strong> ' + meta.buyAndHold + '</span>' +
+      '<span class="metric"><strong>Alpha:</strong> ' + meta.alpha + '</span>' +
       '<span class="metric"><strong>Trades:</strong> ' + meta.trades + '</span>' +
       '<span class="metric"><strong>Win Rate:</strong> ' + meta.winRate + '</span>' +
       '<span class="metric"><strong>Max DD:</strong> ' + meta.maxDrawdown + '</span>' +
       '<span class="metric"><strong>Sharpe:</strong> ' + meta.sharpe + '</span>' +
       '<span class="metric"><strong>Sortino:</strong> ' + meta.sortino + '</span>' +
       '<span class="metric"><strong>PF:</strong> ' + meta.profitFactor + '</span>' +
-      '<span class="metric"><strong>Recovery:</strong> ' + meta.recoveryFactor + '</span>' +
-      '<span class="metric"><strong>Expectancy:</strong> $' + meta.expectancy + '</span>';
+      '<span class="metric"><strong>Expectancy:</strong> $' + meta.expectancy + '</span>' +
+      '<span class="metric"><strong>MAE:</strong> ' + meta.avgMAE + '%</span>' +
+      '<span class="metric"><strong>MFE:</strong> ' + meta.avgMFE + '%</span>' +
+      '<span class="metric"><strong>MC 5-95%:</strong> $' + meta.mc5th + ' - $' + meta.mc95th + '</span>' +
+      '<span class="metric"><strong>Ruin:</strong> ' + (meta.ruinProb * 100).toFixed(1) + '%</span>' +
+      '<span class="metric"><strong>Sig:</strong> ' + (meta.significant ? 'Yes (p=' + meta.pValue + ')' : 'No') + '</span>';
 
     var modal = document.getElementById('chart-modal');
     modal.classList.remove('hidden');
@@ -765,6 +798,7 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
       const profit = r.data.profit ?? 0
       const beatsHodl = profit > 0
       const resultKey = `${r.pair}_${r.interval}_${r.strategy}_${r.startDate}_${r.endDate}`
+      const alpha = r.data.alpha ?? 0
       return `<tr class="${beatsHodl ? 'beats-hodl' : 'loses-hodl'}" data-category="${r.category}" data-pair="${r.pair}">
           <td>${i + 1}</td>
           <td>${r.strategy.toUpperCase()}</td>
@@ -774,7 +808,9 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <td>${r.startDate} \u2192 ${r.endDate}</td>
           <td>$${round(r.data.initialCapital ?? 0).toLocaleString()}</td>
           <td>$${round(r.data.lastPositionMoney ?? 0).toLocaleString()}</td>
-          <td class="${colorClass(profit)}">${r.data.percentageProfit ?? 'N/A'}</td>
+          <td class="${colorClass(r.data.strategyReturn ?? 0)}">${r.data.strategyReturnPct ?? 'N/A'}</td>
+          <td class="${colorClass(r.data.buyAndHoldReturn ?? 0)}">${r.data.buyAndHoldPct ?? 'N/A'}</td>
+          <td class="${colorClass(alpha)}">${round(alpha * 100)}%</td>
           <td>${r.data.percentagePosition ?? 'N/A'}</td>
           <td>${r.data.profitFactor ?? 'N/A'}</td>
           <td>${r.data.maxDrawdown ?? 'N/A'}</td>
@@ -783,6 +819,7 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <td>${r.data.sortino ?? 'N/A'}</td>
           <td class="${colorClass(r.data.expectancy ?? 0)}">$${r.data.expectancy ?? 0}</td>
           <td>${r.data.recoveryFactor ?? 'N/A'}</td>
+          <td>${r.data.isSignificant ? '<span class="positive">Yes</span>' : '<span class="negative">No</span>'}</td>
           <td><button class="chart-btn" onclick="openChart('${resultKey}')">Chart</button></td>
         </tr>`
     })
@@ -799,15 +836,18 @@ function buildRankingsTable(sorted: SimulationResult[]): string {
           <th data-col="5" data-type="string">Dates <span class="sort-arrow"></span></th>
           <th data-col="6" data-type="money">Initial Capital <span class="sort-arrow"></span></th>
           <th data-col="7" data-type="money">Final Capital <span class="sort-arrow"></span></th>
-          <th data-col="8" data-type="percent">Profit vs HODL <span class="sort-arrow"></span></th>
-          <th data-col="9" data-type="percent">Win Rate <span class="sort-arrow"></span></th>
-          <th data-col="10" data-type="number">Profit Factor <span class="sort-arrow"></span></th>
-          <th data-col="11" data-type="percent">Max Drawdown <span class="sort-arrow"></span></th>
-          <th data-col="12" data-type="number">Sharpe <span class="sort-arrow"></span></th>
-          <th data-col="13" data-type="number">Trades <span class="sort-arrow"></span></th>
-          <th data-col="14" data-type="number">Sortino <span class="sort-arrow"></span></th>
-          <th data-col="15" data-type="money">Expectancy <span class="sort-arrow"></span></th>
-          <th data-col="16" data-type="number">Recovery <span class="sort-arrow"></span></th>
+          <th data-col="8" data-type="percent">Strategy Return <span class="sort-arrow"></span></th>
+          <th data-col="9" data-type="percent">Buy &amp; Hold <span class="sort-arrow"></span></th>
+          <th data-col="10" data-type="percent">Alpha <span class="sort-arrow"></span></th>
+          <th data-col="11" data-type="percent">Win Rate <span class="sort-arrow"></span></th>
+          <th data-col="12" data-type="number">Profit Factor <span class="sort-arrow"></span></th>
+          <th data-col="13" data-type="percent">Max Drawdown <span class="sort-arrow"></span></th>
+          <th data-col="14" data-type="number">Sharpe <span class="sort-arrow"></span></th>
+          <th data-col="15" data-type="number">Trades <span class="sort-arrow"></span></th>
+          <th data-col="16" data-type="number">Sortino <span class="sort-arrow"></span></th>
+          <th data-col="17" data-type="money">Expectancy <span class="sort-arrow"></span></th>
+          <th data-col="18" data-type="number">Recovery <span class="sort-arrow"></span></th>
+          <th data-col="19" data-type="string">Significant <span class="sort-arrow"></span></th>
           <th>Chart</th>
         </tr>
       </thead>
@@ -837,6 +877,8 @@ export function generateHtml(
       dates: string
       dataKey: string
       profit: string
+      buyAndHold: string
+      alpha: string
       trades: number
       winRate: string
       maxDrawdown: string
@@ -845,6 +887,14 @@ export function generateHtml(
       profitFactor: number | string
       recoveryFactor: number
       expectancy: number
+      avgMAE: number
+      avgMFE: number
+      significant: boolean
+      pValue: number
+      mcMedian: number
+      mc5th: number
+      mc95th: number
+      ruinProb: number
     }
   > = {}
 
@@ -858,7 +908,10 @@ export function generateHtml(
       interval: r.interval,
       dates: `${r.startDate} \u2192 ${r.endDate}`,
       dataKey,
-      profit: r.data.percentageProfit ?? 'N/A',
+      profit: r.data.strategyReturnPct ?? 'N/A',
+      buyAndHold: r.data.buyAndHoldPct ?? 'N/A',
+      alpha:
+        r.data.alpha !== undefined ? `${round(r.data.alpha * 100)}%` : 'N/A',
       trades: r.data.nbPosition ?? 0,
       winRate: r.data.percentagePosition ?? 'N/A',
       maxDrawdown: r.data.maxDrawdown ?? 'N/A',
@@ -867,6 +920,14 @@ export function generateHtml(
       profitFactor: r.data.profitFactor ?? 'N/A',
       recoveryFactor: r.data.recoveryFactor ?? 0,
       expectancy: r.data.expectancy ?? 0,
+      avgMAE: r.data.avgMAE ?? 0,
+      avgMFE: r.data.avgMFE ?? 0,
+      significant: r.data.isSignificant ?? false,
+      pValue: r.data.pValue ?? 1,
+      mcMedian: r.data.monteCarloMedian ?? 0,
+      mc5th: r.data.monteCarlo5th ?? 0,
+      mc95th: r.data.monteCarlo95th ?? 0,
+      ruinProb: r.data.ruinProbability ?? 0,
     }
   }
 

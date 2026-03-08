@@ -13,11 +13,11 @@
       ["close", ">", "vwma"],
       ["vwma", ">", "movingAverage"],
       ["choppinessIndex", "<", 50],
-      ["rsi", ">", 50]
+      ["rsi", ">", 55]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["close", "<", "vwma"], ["choppinessIndex", ">", 61.8]]
+    "conditions": [["close", "<", "vwma"], ["choppinessIndex", ">", 60]]
   }
 }
