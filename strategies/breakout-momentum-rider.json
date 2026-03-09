@@ -8,7 +8,10 @@
   },
   "buy": {
     "mode": "all",
-    "conditions": [["close", ">", "breakout.upper[-1]"], ["macd.histogram", ">", 0]]
+    "conditions": [
+      ["close", ">", "breakout.upper[-1]"],
+      ["macd.histogram", ">", 0]
+    ]
   },
   "sell": {
     "mode": "all",
