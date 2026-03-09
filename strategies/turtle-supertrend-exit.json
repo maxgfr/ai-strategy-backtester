@@ -1,0 +1,16 @@
+{
+  "name": "turtle-supertrend-exit",
+  "description": "Turtle breakout entry (200-period Donchian, ultra-selective) with adaptive Supertrend exit instead of fixed 10-period Donchian low. The ATR-based Supertrend exit adapts to market volatility — tighter in calm markets, wider in volatile ones.",
+  "indicators": {
+    "breakout": { "_type": "donchian", "period": 200 },
+    "supertrend": { "atrPeriod": 10, "multiplier": 3 }
+  },
+  "buy": {
+    "mode": "all",
+    "conditions": [["close", ">", "breakout.upper[-1]"]]
+  },
+  "sell": {
+    "mode": "all",
+    "conditions": [["close", "<", "supertrend"]]
+  }
+}
