@@ -11,8 +11,8 @@
     "mode": "all",
     "conditions": [
       ["close", ">", "supertrend"],
-      ["kdj.j", ">", 20],
-      ["kdj.j[-1]", "<", 0],
+      ["kdj.j[-1]", "<", 20],
+      ["kdj.j", ">", "kdj.j[-1]"],
       ["macd.histogram", ">", 0]
     ]
   },
@@ -20,8 +20,8 @@
     "mode": "any",
     "conditions": [
       ["close", "<", "supertrend"],
-      ["kdj.j", ">", 100],
-      ["rsi", ">", 78]
+      ["kdj.j", ">", 80],
+      ["rsi", ">", 75]
     ]
   }
 }

@@ -12,12 +12,11 @@
     "conditions": [
       ["cci", ">", 0],
       ["cci[-1]", "<", 0],
-      ["williamsR", "<", -80],
       ["close", ">", "supertrend"]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["cci", ">", 200], ["close", "<", "supertrend"]]
+    "conditions": [["cci", ">", 150], ["close", "<", "supertrend"]]
   }
 }

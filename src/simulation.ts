@@ -196,27 +196,22 @@ function computeAdvancedMetrics(
   const avgDrawdownDuration =
     drawdownCount === 0 ? 0 : round(totalDrawdownDuration / drawdownCount)
 
-  const mean = tradeProfits.reduce((s, p) => s + p, 0) / tradeProfits.length
+  const n = tradeProfits.length
+  const mean = tradeProfits.reduce((s, p) => s + p, 0) / n
+  // Sample variance (N-1) for unbiased estimate
   const variance =
-    tradeProfits.reduce((s, p) => s + (p - mean) ** 2, 0) / tradeProfits.length
+    n < 2 ? 0 : tradeProfits.reduce((s, p) => s + (p - mean) ** 2, 0) / (n - 1)
   const stdDev = Math.sqrt(variance)
 
   // Annualized Sharpe: multiply by sqrt(trades per year)
   const backtestYears = backtestDays / 365
-  const tradesPerYear =
-    backtestYears > 0
-      ? tradeProfits.length / backtestYears
-      : tradeProfits.length
+  const tradesPerYear = backtestYears > 0 ? n / backtestYears : n
   const annualizationFactor = Math.sqrt(tradesPerYear)
   const sharpe = stdDev === 0 ? 0 : round((mean / stdDev) * annualizationFactor)
 
-  // Sortino: downside deviation only (denominator = number of losing trades)
-  const downsideReturns = tradeProfits.filter((p) => p < 0)
-  const downsideVariance =
-    downsideReturns.length === 0
-      ? 0
-      : downsideReturns.reduce((s, p) => s + p ** 2, 0) / downsideReturns.length
-  const downsideDev = Math.sqrt(downsideVariance)
+  // Sortino: downside deviation using total N (standard formula with target = 0)
+  const downsideSum = tradeProfits.reduce((s, p) => s + (p < 0 ? p ** 2 : 0), 0)
+  const downsideDev = n < 2 ? 0 : Math.sqrt(downsideSum / (n - 1))
   const sortino =
     downsideDev === 0
       ? mean > 0
@@ -643,7 +638,7 @@ async function simulation(
       tradeMAE = 0
       tradeMFE = 0
       tradeType = 'buy'
-    } else if (signal === 'sell' && lastPosition.type !== 'sell') {
+    } else if (signal === 'sell' && lastPosition.type === 'buy') {
       if (tradeType !== null) {
         maeValues.push(tradeMAE)
         mfeValues.push(tradeMFE)

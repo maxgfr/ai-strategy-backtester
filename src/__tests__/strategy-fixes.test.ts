@@ -110,7 +110,7 @@ describe('strategy fixes validation', () => {
     // Should have adx.adx > 20 in buy conditions
     if (def.buy.mode === 'all') {
       const adxCondition = def.buy.conditions.find(
-        (c) => c[0] === 'adx.adx' && c[1] === '>' && c[2] === 20,
+        (c) => c[0] === 'adx.adx' && c[1] === '>' && c[2] === 18,
       )
       expect(adxCondition).toBeDefined()
       expect(def.buy.conditions.length).toBe(4)

@@ -33,15 +33,20 @@ function classifyResult(data: DbSchema): Category {
 
 function parseFilename(filename: string): ParsedFilename | null {
   const name = filename.replace('.json', '')
-  const parts = name.split('_')
-  if (parts.length !== 5) return null
+  // Format: PAIR_INTERVAL_STRATEGY_STARTDATE_ENDDATE
+  // Strategy names may contain hyphens/underscores, so match dates from the end
+  // Dates are YYYY-MM-DD (with hyphens) or YYYYMMDD (without)
+  const match = name.match(
+    /^([A-Z0-9]+)_(\w+?)_(.+)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/,
+  )
+  if (!match) return null
 
   return {
-    pair: parts[0],
-    interval: parts[1],
-    strategy: parts[2],
-    startDate: parts[3],
-    endDate: parts[4],
+    pair: match[1],
+    interval: match[2],
+    strategy: match[3],
+    startDate: match[4],
+    endDate: match[5],
   }
 }
 

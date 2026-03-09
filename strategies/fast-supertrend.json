@@ -10,8 +10,8 @@
     "mode": "all",
     "conditions": [
       ["close", ">", "supertrend"],
-      ["rsi", "<", 35],
-      ["adx.adx", ">", 20]
+      ["rsi", "<", 40],
+      ["adx.adx", ">", 18]
     ]
   },
   "sell": {

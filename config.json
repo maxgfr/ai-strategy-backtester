@@ -14,7 +14,8 @@
   "defaults": {
     "timeframes": ["6h"],
     "stop_loss_pct": 0.08,
-    "trailing_stop_pct": 0.12
+    "trailing_stop_pct": 0.12,
+    "max_drawdown_pct": 0.3
   },
   "strategies": {
     "trend-momentum-rider": {
@@ -43,10 +44,10 @@
       "stop_loss_pct": 0.15,
       "trailing_stop_pct": 0.15
     },
-    "turtle": { "timeframes": ["6h", "12h"], "max_drawdown_pct": 0.3 },
-    "breakout-volume": { "max_drawdown_pct": 0.3 },
-    "keltner-breakout": { "max_drawdown_pct": 0.3 },
-    "confluence": { "timeframes": ["4h", "6h"], "max_drawdown_pct": 0.3 },
+    "turtle": { "timeframes": ["6h", "12h"] },
+    "breakout-volume": {},
+    "keltner-breakout": {},
+    "confluence": { "timeframes": ["4h", "6h"] },
     "supertrend-pullback-momentum": {},
     "fast-supertrend": {},
     "kdj-extreme-recovery": {
@@ -55,7 +56,7 @@
     },
     "dpo-rsi-pullback": { "stop_loss_pct": 0.1, "trailing_stop_pct": 0.18 },
     "bollinger-squeeze": {},
-    "stochrsi-trend-filter": { "max_drawdown_pct": 0.3 },
+    "stochrsi-trend-filter": {},
     "vwap-momentum": {},
     "cci-williams-momentum": {},
     "hull-chop-momentum": { "stop_loss_pct": 0.08, "trailing_stop_pct": 0.18 },

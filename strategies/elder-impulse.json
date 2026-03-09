@@ -16,10 +16,7 @@
     ]
   },
   "sell": {
-    "mode": "any",
-    "conditions": [
-      ["elderRay.bearPower", "<", "elderRay.bearPower[-1]"],
-      ["close", "<", "ema"]
-    ]
+    "mode": "all",
+    "conditions": [["elderRay.bearPower", "<", 0], ["close", "<", "ema"]]
   }
 }

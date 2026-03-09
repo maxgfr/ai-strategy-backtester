@@ -12,12 +12,12 @@
     "conditions": [
       ["close", ">", "hma"],
       ["choppinessIndex", "<", 50],
-      ["ultimateOscillator", "<", 35],
-      ["adx.adx", ">", 20]
+      ["ultimateOscillator", "<", 45],
+      ["adx.adx", ">", 18]
     ]
   },
   "sell": {
     "mode": "any",
-    "conditions": [["ultimateOscillator", ">", 70], ["close", "<", "hma"]]
+    "conditions": [["ultimateOscillator", ">", 65], ["close", "<", "hma"]]
   }
 }
