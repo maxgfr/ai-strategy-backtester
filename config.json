@@ -13,60 +13,60 @@
   "walkForward": { "enabled": true, "trainRatio": 0.7 },
   "defaults": {
     "timeframes": ["6h"],
-    "stop_loss_pct": 0.1,
-    "trailing_stop_pct": 0.15
+    "stop_loss_pct": 0.08,
+    "trailing_stop_pct": 0.12
   },
   "strategies": {
     "trend-momentum-rider": {
       "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.22
     },
     "ichimoku-cloud": {
       "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.22
     },
     "supertrend": {
       "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.22
     },
     "pmax": {
       "timeframes": ["6h", "12h"],
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.22
     },
-    "rsi-macd-trend-ride": { "stop_loss_pct": 0.15, "trailing_stop_pct": 0.2 },
+    "rsi-macd-trend-ride": { "stop_loss_pct": 0.15, "trailing_stop_pct": 0.15 },
     "coppock-bottom": {
       "timeframes": ["6h", "12h"],
       "stop_loss_pct": 0.15,
-      "trailing_stop_pct": 0.2
+      "trailing_stop_pct": 0.15
     },
-    "turtle": { "timeframes": ["6h", "12h"], "max_drawdown_pct": 0.35 },
-    "breakout-volume": { "max_drawdown_pct": 0.35 },
-    "keltner-breakout": { "max_drawdown_pct": 0.35 },
-    "confluence": { "timeframes": ["4h", "6h"], "max_drawdown_pct": 0.35 },
+    "turtle": { "timeframes": ["6h", "12h"], "max_drawdown_pct": 0.3 },
+    "breakout-volume": { "max_drawdown_pct": 0.3 },
+    "keltner-breakout": { "max_drawdown_pct": 0.3 },
+    "confluence": { "timeframes": ["4h", "6h"], "max_drawdown_pct": 0.3 },
     "supertrend-pullback-momentum": {},
     "fast-supertrend": {},
     "kdj-extreme-recovery": {
-      "stop_loss_pct": 0.12,
-      "trailing_stop_pct": 0.18
+      "stop_loss_pct": 0.08,
+      "trailing_stop_pct": 0.22
     },
-    "dpo-rsi-pullback": { "stop_loss_pct": 0.12, "trailing_stop_pct": 0.18 },
+    "dpo-rsi-pullback": { "stop_loss_pct": 0.1, "trailing_stop_pct": 0.18 },
     "bollinger-squeeze": {},
     "stochrsi-trend-filter": { "max_drawdown_pct": 0.3 },
     "vwap-momentum": {},
     "cci-williams-momentum": {},
-    "hull-chop-momentum": { "stop_loss_pct": 0.12, "trailing_stop_pct": 0.18 },
+    "hull-chop-momentum": { "stop_loss_pct": 0.08, "trailing_stop_pct": 0.18 },
     "vwma-chop-breakout": {},
     "aroon-trend-rider": {},
     "psar-momentum": {},
     "elder-impulse": {},
     "adaptive-momentum-reversal": {
-      "stop_loss_pct": 0.08,
-      "trailing_stop_pct": 0.12,
-      "max_drawdown_pct": 0.25,
+      "stop_loss_pct": 0.06,
+      "trailing_stop_pct": 0.1,
+      "max_drawdown_pct": 0.2,
       "risk_per_trade": 0.02
     }
   },

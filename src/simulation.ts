@@ -404,15 +404,17 @@ async function simulation(
     }
     prevTime = candle.time
 
-    // === MAE/MFE tracking (before liquidation/stops so final candle is captured) ===
+    // === MAE/MFE tracking (intra-candle via high/low) ===
     if (tradeType === 'buy' && tradeEntryPrice > 0) {
-      const pctMove = (price - tradeEntryPrice) / tradeEntryPrice
-      if (pctMove < tradeMAE) tradeMAE = pctMove
-      if (pctMove > tradeMFE) tradeMFE = pctMove
+      const worstMove = (candle.low - tradeEntryPrice) / tradeEntryPrice
+      const bestMove = (candle.high - tradeEntryPrice) / tradeEntryPrice
+      if (worstMove < tradeMAE) tradeMAE = worstMove
+      if (bestMove > tradeMFE) tradeMFE = bestMove
     } else if (tradeType === 'short' && tradeEntryPrice > 0) {
-      const pctMove = (tradeEntryPrice - price) / tradeEntryPrice
-      if (pctMove < tradeMAE) tradeMAE = pctMove
-      if (pctMove > tradeMFE) tradeMFE = pctMove
+      const worstMove = (tradeEntryPrice - candle.high) / tradeEntryPrice
+      const bestMove = (tradeEntryPrice - candle.low) / tradeEntryPrice
+      if (worstMove < tradeMAE) tradeMAE = worstMove
+      if (bestMove > tradeMFE) tradeMFE = bestMove
     }
 
     // === Liquidation check (leverage only, funding erodes margin) ===
@@ -477,10 +479,11 @@ async function simulation(
       }
     }
 
-    // === Stop loss check (apply slippage to execution price) ===
+    // === Stop loss check (intra-candle via high/low, execute at stop price + slippage) ===
     if (stopLossPct !== undefined && lastPosition.type === 'buy') {
-      if (price <= lastPosition.price * (1 - stopLossPct)) {
-        const slippedPrice = price * (1 - slippage)
+      const stopPrice = lastPosition.price * (1 - stopLossPct)
+      if (candle.low <= stopPrice) {
+        const slippedPrice = stopPrice * (1 - slippage)
         executeSell(
           slippedPrice,
           date,
@@ -506,8 +509,9 @@ async function simulation(
       }
     }
     if (stopLossPct !== undefined && lastPosition.type === 'short') {
-      if (price >= lastPosition.price * (1 + stopLossPct)) {
-        const slippedPrice = price * (1 + slippage)
+      const stopPrice = lastPosition.price * (1 + stopLossPct)
+      if (candle.high >= stopPrice) {
+        const slippedPrice = stopPrice * (1 + slippage)
         executeCover(
           slippedPrice,
           date,
@@ -532,15 +536,16 @@ async function simulation(
       }
     }
 
-    // === Trailing stop check (apply slippage to execution price) ===
+    // === Trailing stop check (intra-candle: track peak/trough via high/low, execute at trail price + slippage) ===
     if (lastPosition.type === 'buy') {
-      if (price > peakPrice) peakPrice = price
+      if (candle.high > peakPrice) peakPrice = candle.high
       if (
         trailingStopPct !== undefined &&
         peakPrice > 0 &&
-        price <= peakPrice * (1 - trailingStopPct)
+        candle.low <= peakPrice * (1 - trailingStopPct)
       ) {
-        const slippedPrice = price * (1 - slippage)
+        const trailPrice = peakPrice * (1 - trailingStopPct)
+        const slippedPrice = trailPrice * (1 - slippage)
         executeSell(
           slippedPrice,
           date,
@@ -565,13 +570,14 @@ async function simulation(
       }
     }
     if (lastPosition.type === 'short') {
-      if (price < troughPrice) troughPrice = price
+      if (candle.low < troughPrice) troughPrice = candle.low
       if (
         trailingStopPct !== undefined &&
         troughPrice < Number.POSITIVE_INFINITY &&
-        price >= troughPrice * (1 + trailingStopPct)
+        candle.high >= troughPrice * (1 + trailingStopPct)
       ) {
-        const slippedPrice = price * (1 + slippage)
+        const trailPrice = troughPrice * (1 + trailingStopPct)
+        const slippedPrice = trailPrice * (1 + slippage)
         executeCover(
           slippedPrice,
           date,
@@ -960,23 +966,25 @@ export async function runSimulation(
       { interval: BinanceInterval; pair: string; start: Date; end: Date }
     >()
 
-    // Walk-forward: split each date range into train/test periods
+    // Walk-forward: split each date range and keep only the test period (last portion)
     const effectiveDates = walkForward?.enabled
-      ? dates.flatMap((d) => {
+      ? dates.map((d) => {
           const totalMs = d.end.getTime() - d.start.getTime()
           const splitMs = d.start.getTime() + totalMs * walkForward.trainRatio
           const splitDate = new Date(splitMs)
-          return [
-            { start: d.start, end: splitDate },
-            { start: splitDate, end: d.end },
-          ]
+          return { start: splitDate, end: d.end }
         })
       : dates
 
     if (walkForward?.enabled) {
       logger.info(
-        `Walk-forward enabled: ${(walkForward.trainRatio * 100).toFixed(0)}% train / ${((1 - walkForward.trainRatio) * 100).toFixed(0)}% test`,
+        `Walk-forward enabled: ${(walkForward.trainRatio * 100).toFixed(0)}% train (discarded) / ${((1 - walkForward.trainRatio) * 100).toFixed(0)}% test (kept)`,
       )
+      for (const d of effectiveDates) {
+        logger.info(
+          `  Test period: ${formatDate(d.start)} → ${formatDate(d.end)}`,
+        )
+      }
     }
 
     const strategyNames = Object.keys(strategies)
@@ -1028,27 +1036,6 @@ export async function runSimulation(
     if (allCombinations.length === 0) {
       logger.warn('No simulation combinations generated')
       return runId
-    }
-
-    // Walk-forward needs original full-range data files too (sub-periods read from them)
-    if (walkForward?.enabled) {
-      for (const pair of symbols) {
-        for (const [, strategyConfig] of Object.entries(strategies)) {
-          for (const tf of strategyConfig.timeframes) {
-            for (const dateRange of dates) {
-              const fullKey = `${pair}_${tf}_${formatDate(dateRange.start)}_${formatDate(dateRange.end)}`
-              if (!uniqueData.has(fullKey)) {
-                uniqueData.set(fullKey, {
-                  interval: tf,
-                  pair,
-                  start: dateRange.start,
-                  end: dateRange.end,
-                })
-              }
-            }
-          }
-        }
-      }
     }
 
     logger.info(`Downloading ${uniqueData.size} unique data files...`)
