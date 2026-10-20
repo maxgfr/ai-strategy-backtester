@@ -238,4 +238,4 @@ pnpm format:check      # Biome format check
 pnpm typecheck         # TypeScript type check
 ```
 
-See `CLAUDE.md` for full architecture reference and AI assistance guidelines.
+See `AGENTS.md` for full architecture reference and AI assistance guidelines.
